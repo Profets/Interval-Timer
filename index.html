@@ -59,9 +59,9 @@ button:focus-visible,.wheel:focus-visible{outline:2px solid var(--yellow);outlin
 .ios-home{position:absolute;left:0;right:0;bottom:0;height:34px;z-index:55;align-items:center;justify-content:center;pointer-events:none}
 .ios-home i{width:134px;height:5px;border-radius:3px;background:var(--fg);opacity:.9;margin-top:8px}
 /* film grain */
-.device::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:60;opacity:.045;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
-.app{height:100%;display:flex;flex-direction:column;padding-top:calc(14px + var(--sat));padding-bottom:calc(16px + var(--sab));gap:14px}
+.device::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:60;opacity:.045;transform:translateZ(0);
+  background-image:var(--grain,none);background-size:128px 128px}
+.app{height:100%;display:flex;flex-direction:column;padding-top:calc(14px + var(--sat));padding-bottom:max(16px,calc(var(--sab) - 6px));gap:14px}  /* ~28 pt above the screen edge on Face ID iPhones, like Figma */
 
 /* Header with the four-band mark */
 header{display:flex;align-items:center;justify-content:space-between;min-height:44px}
@@ -103,7 +103,7 @@ header{display:flex;align-items:center;justify-content:space-between;min-height:
 .row .tag{display:none}
 .row .id{position:absolute;right:12px;top:7px;font-family:var(--f-mono);font-size:8.5px;letter-spacing:.16em;color:var(--muted);opacity:.7}
 .row .lab,.next .lab{display:flex;flex-direction:column;gap:3px;min-width:0}
-.row .name,.next .name{font-family:var(--f-display);font-weight:700;font-size:17.5px;letter-spacing:.06em;text-transform:uppercase}
+.row .name,.next .name{font-family:var(--f-display);font-weight:700;font-size:20px;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
 .row .val{margin-left:auto;font-size:clamp(34px,12cqw,46px);line-height:1}
 .row.count .val{color:var(--fg)}
 .row.dim{opacity:.35}
@@ -113,9 +113,9 @@ header{display:flex;align-items:center;justify-content:space-between;min-height:
 
 /* Run: HUD + dial */
 .hud{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.hud > div{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:12px 14px 12px 18px;border-radius:10px;border:1px solid var(--line);
+.hud > div{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:14px 12px 12px;text-align:center;border-radius:10px;border:1px solid var(--line);
   background:linear-gradient(160deg,color-mix(in srgb,var(--panel) 40%,transparent) 0%,color-mix(in srgb,var(--panel2) 40%,transparent) 100%)}
-.hud .digits{font-size:30px}
+.hud .digits{font-size:58px;line-height:1}
 .dialwrap{flex:1;min-height:0;position:relative;display:grid;place-items:center}
 .dialwrap .cn{position:absolute;width:18px;height:18px;border-color:var(--dim);border-style:solid;border-width:0}
 .cn.tl{left:0;top:0;border-left-width:1px;border-top-width:1px;border-top-left-radius:6px}
@@ -134,7 +134,7 @@ header{display:flex;align-items:center;justify-content:space-between;min-height:
 /* Glow: a blurred copy of only the lit bars (fill only, no stroke) laid OVER the ring, so it also softly tints the dark gaps */
 .dialin{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center}
 .phase{display:flex;align-items:center;gap:8px;padding:6px 16px;border-radius:999px;background:var(--phase);color:var(--bg);box-shadow:0 0 16px color-mix(in srgb,var(--phase) 20%,transparent);
-  font-family:var(--f-display);font-weight:800;font-size:17.5px;letter-spacing:.1em;text-transform:uppercase;transition:background-color .3s}
+  font-family:var(--f-display);font-weight:800;font-size:20px;letter-spacing:.1em;text-transform:uppercase;transition:background-color .3s}
 .phase::before{content:none}
 .big{font-size:clamp(60px,24cqw,92px);line-height:1;color:var(--fg)}
 .big.warn{color:var(--phase)}
@@ -159,7 +159,8 @@ header{display:flex;align-items:center;justify-content:space-between;min-height:
 .reset svg{width:15px;height:15px}
 
 /* Full-screen overlay (editor / sounds) */
-.overlay{position:absolute;inset:0;z-index:40;background:var(--bg);display:flex;flex-direction:column;padding-top:calc(14px + var(--sat));padding-bottom:calc(20px + var(--sab))}
+.overlay{position:absolute;inset:0;z-index:40;background:var(--bg);display:flex;flex-direction:column;padding-top:calc(14px + var(--sat));padding-bottom:max(20px,calc(var(--sab) - 2px))}
+[hidden]{display:none!important}
 .nav{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;min-height:52px;border-bottom:1px solid var(--line)}
 .nav h2{margin:0;font-family:var(--f-display);font-weight:800;font-size:17px;letter-spacing:.1em;text-transform:uppercase;display:flex;align-items:center;gap:10px}
 .nav h2 i{width:10px;height:10px;border-radius:50%;background:var(--c,var(--fg));box-shadow:0 0 16px color-mix(in srgb,var(--c,var(--fg)) 20%,transparent)}
@@ -187,7 +188,7 @@ header{display:flex;align-items:center;justify-content:space-between;min-height:
 .toggle[aria-checked="true"]::after{transform:translateX(22px);background:var(--fg)}
 .test{margin-top:18px;align-self:flex-start;font-family:var(--f-mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;padding:12px 18px;border:1px solid var(--line);border-radius:999px;background:var(--panel)}
 
-@media (max-height:700px){.wheelwrap{--ih:56px}.wi{font-size:44px}.hud .digits{font-size:24px}}
+@media (max-height:700px){.wheelwrap{--ih:56px}.wi{font-size:44px}.hud .digits{font-size:44px}}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
 </style>
 </head>
@@ -214,8 +215,8 @@ header{display:flex;align-items:center;justify-content:space-between;min-height:
 
     <section class="view" id="run" hidden aria-live="polite" style="gap:12px">
       <div class="hud" id="hud">
-        <div><span class="mono">Rounds</span><span id="roundV"></span></div>
-        <div><span class="mono">Cycles</span><span id="cycleV"></span></div>
+        <div><span class="mono">Rounds left</span><span id="roundV"></span></div>
+        <div><span class="mono">Cycles left</span><span id="cycleV"></span></div>
       </div>
       <div class="dialwrap"><canvas class="dial" id="dial" aria-hidden="true"></canvas>
         <i class="cn tl"></i><i class="cn tr"></i><i class="cn bl"></i><i class="cn br"></i>
@@ -441,7 +442,7 @@ function setLit(n){dialLit=n;dialEdge=n;drawDial()}
 function setEdge(f){dialLit=Math.ceil(f);dialEdge=f;drawDial()}
 
 /* ---------- Timer ---------- */
-function resetState(){Q=build(S);st={idx:0,elapsed:0,running:false,started:false,done:false,last:0,lastRem:null,tickT:0}}
+function resetState(){runKey="";Q=build(S);st={idx:0,elapsed:0,running:false,started:false,done:false,last:0,lastRem:null,tickT:0}}
 function loop(now){
   if(st.running){
     const dt=now-st.last;st.elapsed+=dt;st.last=now;st.tickT+=dt;
@@ -464,18 +465,22 @@ let curPhase="?";
 function setPhase(type){if(type===curPhase)return;curPhase=type;   // touching the root style every frame forced a full restyle
   rootStyle.setProperty("--phase",type?"var("+META[type].c+")":"var(--fg)");
   dialCols.on=getComputedStyle(document.documentElement).getPropertyValue(type?META[type].c:"--fg").trim();dialKey="";}
+let runKey="",nextVis=null;function setNextVis(v){if(v!==nextVis){nextVis=v;$("nextBox").style.visibility=v?"visible":"hidden"}}
 let nextC="";function setNextC(v){if(v!==nextC){nextC=v;$("nextBox").style.setProperty("--c",v)}}
 function renderRun(){
   const cur=Q[st.idx], nxt=Q[st.idx+1];
   if(st.done||!cur){
     setPhase(null);setText($("phaseName"),"Complete");setHTML($("bigTime"),digits("00:00"));$("bigTime").classList.remove("warn");setLit(0);setEdge(0);
     setHTML($("roundV"),digits("00"));setHTML($("cycleV"),digits("00"));
-    setText($("remaining"),"Total "+fmt(totalOf(Q)));$("nextBox").style.visibility="hidden";return;
+    setText($("remaining"),"Total "+fmt(totalOf(Q)));setNextVis(false);runKey="";return;
   }
-  setPhase(cur.type);setText($("phaseName"),META[cur.type].name);
   const remMs=cur.dur*1000-st.elapsed, rem=Math.ceil(remMs/1000);
+  const key=st.idx+"|"+rem+"|"+st.started, changed=key!==runKey;
+  if(changed)setPhase(cur.type);
+  if(!busy){const f=N*Math.max(0,remMs)/(cur.dur*1000);setEdge(f)}       // the only per-frame work: the ring (canvas, redrawn only if it changed)
+  if(!changed)return;runKey=key;   // everything below runs once per second
+  setText($("phaseName"),META[cur.type].name);
   setHTML($("bigTime"),digits(fmt(rem)));$("bigTime").classList.toggle("warn",st.started&&rem<=3);
-  if(!busy){const f=N*Math.max(0,remMs)/(cur.dur*1000);setLit(Math.ceil(f));setEdge(f)}
   const cr=cur.type==="cycleRest";
   setHTML($("cycleV"),digits(pad(S.cycles-cur.cycle+(cr?0:1))));
   setHTML($("roundV"),digits(pad(cr?0:S.rounds-cur.round+1)));
@@ -483,7 +488,7 @@ function renderRun(){
   setText($("remaining"),"Remaining "+fmt(Math.ceil(left)));
   setText($("seq"),pad(st.idx+1)+"/"+pad(Q.length));setText($("phCode"),META[cur.type].code);
   setText($("elapsed"),fmt(Math.floor(totalOf(Q)-left)));
-  $("nextBox").style.visibility="visible";
+  setNextVis(true);
   if(nxt){setNextC("var("+META[nxt.type].c+")");setText($("nextName"),META[nxt.type].name);setHTML($("nextTime"),digits(fmt(nxt.dur)))}
   else{setNextC("var(--fg)");setText($("nextName"),"Finish");setHTML($("nextTime"),"")}
 }
@@ -630,6 +635,9 @@ $("soundBtn").addEventListener("click",()=>{
   },"Version 1.0 · Made by Profets",null);
 });
 
+(function(){try{const c=document.createElement("canvas");c.width=c.height=128;const x=c.getContext("2d"),d=x.createImageData(128,128);
+  for(let i=0;i<d.data.length;i+=4){const v=Math.random()*255;d.data[i]=d.data[i+1]=d.data[i+2]=v;d.data[i+3]=255}x.putImageData(d,0,0);
+  $("device").style.setProperty("--grain","url("+c.toDataURL()+")")}catch(e){}})();
 resetState();paintHome();renderControls();requestAnimationFrame(loop);
 </script>
 <script>
