@@ -59,7 +59,7 @@ button:focus-visible,.wheel:focus-visible{outline:2px solid var(--yellow);outlin
 .ios-home{position:absolute;left:0;right:0;bottom:0;height:34px;z-index:55;align-items:center;justify-content:center;pointer-events:none}
 .ios-home i{width:134px;height:5px;border-radius:3px;background:var(--fg);opacity:.9;margin-top:8px}
 /* film grain */
-.device::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:60;opacity:.07;mix-blend-mode:overlay;
+.device::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:60;opacity:.045;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
 .app{height:100%;display:flex;flex-direction:column;padding-top:calc(14px + var(--sat));padding-bottom:calc(16px + var(--sab));gap:14px}
 
@@ -132,13 +132,12 @@ header{display:flex;align-items:center;justify-content:space-between;min-height:
 /* Thin ring: continuous dark track; only the lit part is split into segments, with phosphor bloom */
 .dial .track{display:none}
 /* 120 thin bars all round; the gaps are a background-coloured stroke so they stay a constant width */
-.dial .tk{fill:var(--panel);stroke:var(--bg);stroke-width:2.6;stroke-linejoin:miter;transition:fill .12s}
+.dial .tk{fill:var(--panel);stroke:var(--bg);stroke-width:2.6;stroke-linejoin:miter}
+.dglow{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:.15;
+  -webkit-mask-image:conic-gradient(from 0deg at 50% 50%,#000 0deg var(--gdeg,360deg),transparent var(--gdeg,360deg));mask-image:conic-gradient(from 0deg at 50% 50%,#000 0deg var(--gdeg,360deg),transparent var(--gdeg,360deg))}
 .dial .tk.on{fill:var(--phase)}
 .dial .lit{filter:none}
 /* Glow: a blurred copy of only the lit bars (fill only, no stroke) laid OVER the ring, so it also softly tints the dark gaps */
-.dial .gl{fill:transparent;stroke:none}
-.dial .gl.on{fill:var(--phase)}
-.dial .glow{opacity:.15;pointer-events:none;mix-blend-mode:screen}
 .dial .face{fill:none}
 .dialin{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center}
 .phase{display:flex;align-items:center;gap:8px;padding:6px 16px;border-radius:999px;background:var(--phase);color:var(--bg);box-shadow:0 0 16px color-mix(in srgb,var(--phase) 20%,transparent);
@@ -416,23 +415,42 @@ function keepAwakeVideo(on){
 async function holdWake(){keepAwakeVideo(true);try{wake=await navigator.wakeLock?.request("screen")}catch(e){wake=null}}
 function releaseWake(){keepAwakeVideo(false);try{wake&&wake.release()}catch(e){}wake=null}
 
-/* ---------- Dial ---------- */
-const N=120, ticks=[], glows=[];
+/* ---------- Dial ----------
+   Performance: the bars are plain SVG paths (only class changes); the glow is a canvas painted ONCE per phase
+   and revealed with a conic mask, so nothing is re-blurred while the timer runs. The edge bar fades smoothly. */
+const N=120, ticks=[];
+let glowCv=null;
 (function(){const ns="http://www.w3.org/2000/svg",svg=$("dial");
-  const face=document.createElementNS(ns,"circle");face.setAttribute("class","face");face.setAttribute("cx",150);face.setAttribute("cy",150);face.setAttribute("r",112);svg.appendChild(face);
-  const tr=document.createElementNS(ns,"circle");tr.setAttribute("class","track");tr.setAttribute("cx",150);tr.setAttribute("cy",150);tr.setAttribute("r",139);svg.appendChild(tr);
-  const defs=document.createElementNS(ns,"defs");defs.innerHTML='<filter id="dialGlow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="8"/></filter>';svg.appendChild(defs);
   const g=document.createElementNS(ns,"g");g.setAttribute("class","lit");svg.appendChild(g);
-  const gg=document.createElementNS(ns,"g");gg.setAttribute("class","glow");gg.setAttribute("filter","url(#dialGlow)");svg.appendChild(gg);
   const r1=126,r2=147,P=(r,a)=>(150+r*Math.cos(a)).toFixed(2)+" "+(150+r*Math.sin(a)).toFixed(2);
   for(let i=0;i<N;i++){const a0=i/N*2*Math.PI-Math.PI/2,a1=(i+1)/N*2*Math.PI-Math.PI/2;
     const p=document.createElementNS(ns,"path");p.setAttribute("class","tk");
     p.setAttribute("d","M"+P(r1,a0)+" L"+P(r2,a0)+" A"+r2+" "+r2+" 0 0 1 "+P(r2,a1)+" L"+P(r1,a1)+" A"+r1+" "+r1+" 0 0 0 "+P(r1,a0)+"Z");
-    g.appendChild(p);ticks.push(p);
-    const q=p.cloneNode();q.setAttribute("class","gl");gg.appendChild(q);glows.push(q)}
+    g.appendChild(p);ticks.push(p)}
+  glowCv=document.createElement("canvas");glowCv.className="dglow";glowCv.setAttribute("aria-hidden","true");svg.after(glowCv);
 })();
-let litCount=-1;
-function setLit(n){if(n===litCount)return;litCount=n;ticks.forEach((t,i)=>t.classList.toggle("on",i<n));glows.forEach((t,i)=>t.classList.toggle("on",i<n))}
+let glowColor="";
+function drawGlow(color){
+  if(!glowCv)return;glowColor=color||glowColor;const box=glowCv.parentElement.getBoundingClientRect();
+  const dpr=Math.min(3,window.devicePixelRatio||1),W=Math.round(box.width*dpr),H=Math.round(box.height*dpr);
+  if(!W||!H)return;glowCv.width=W;glowCv.height=H;const ctx=glowCv.getContext("2d");ctx.clearRect(0,0,W,H);
+  if(!glowColor)return;
+  const s=Math.min(W,H)/300,cx=W/2,cy=H/2,OFF=W*4,r1=126*s,r2=147*s;
+  ctx.fillStyle="#000";ctx.shadowColor=glowColor;ctx.shadowBlur=16*s;ctx.shadowOffsetX=OFF;   // draw only the shadow, off-canvas shapes
+  for(let i=0;i<N;i++){const a0=i/N*2*Math.PI-Math.PI/2,a1=(i+1)/N*2*Math.PI-Math.PI/2-.012;
+    ctx.beginPath();ctx.arc(cx-OFF,cy,r2,a0,a1);ctx.arc(cx-OFF,cy,r1,a1,a0,true);ctx.closePath();ctx.fill()}
+}
+addEventListener("resize",()=>drawGlow());
+let litCount=-1, edgeIdx=-1;
+function setLit(n){
+  if(n!==litCount){litCount=n;ticks.forEach((t,i)=>t.classList.toggle("on",i<n));
+    if(glowCv)glowCv.style.setProperty("--gdeg",(n/N*360).toFixed(2)+"deg")}
+}
+function setEdge(f){   // f = exact lit amount; the last lit bar fades from phase colour to panel
+  const n=Math.ceil(f),i=n-1,frac=f-Math.floor(f)||1;
+  if(edgeIdx!==i&&edgeIdx>=0&&ticks[edgeIdx])ticks[edgeIdx].style.fill="";
+  edgeIdx=i;if(i>=0&&ticks[i])ticks[i].style.fill=frac>=.999?"":"color-mix(in srgb,var(--phase) "+(frac*100).toFixed(0)+"%,var(--panel))";
+}
 
 /* ---------- Timer ---------- */
 function resetState(){Q=build(S);st={idx:0,elapsed:0,running:false,started:false,done:false,last:0,lastRem:null,tickT:0}}
@@ -453,18 +471,19 @@ function loop(now){
   requestAnimationFrame(loop);
 }
 function finish(){st.running=false;st.done=true;st.idx=Q.length;releaseWake();SFX.done();speak("done","Workout complete");renderRun();renderControls()}
-function setPhase(type){rootStyle.setProperty("--phase",type?"var("+META[type].c+")":"var(--fg)")}
+function setPhase(type){rootStyle.setProperty("--phase",type?"var("+META[type].c+")":"var(--fg)");
+  const col=type?getComputedStyle(document.documentElement).getPropertyValue(META[type].c).trim():"";if(col!==glowColor||!type){glowColor=col;drawGlow(col)}}
 function renderRun(){
   const cur=Q[st.idx], nxt=Q[st.idx+1];
   if(st.done||!cur){
-    setPhase(null);setText($("phaseName"),"Complete");setHTML($("bigTime"),digits("00:00"));$("bigTime").classList.remove("warn");setLit(0);
+    setPhase(null);setText($("phaseName"),"Complete");setHTML($("bigTime"),digits("00:00"));$("bigTime").classList.remove("warn");setLit(0);setEdge(0);
     setHTML($("roundV"),digits("00"));setHTML($("cycleV"),digits("00"));
     setText($("remaining"),"Total "+fmt(totalOf(Q)));$("nextBox").style.visibility="hidden";return;
   }
   setPhase(cur.type);setText($("phaseName"),META[cur.type].name);
   const remMs=cur.dur*1000-st.elapsed, rem=Math.ceil(remMs/1000);
   setHTML($("bigTime"),digits(fmt(rem)));$("bigTime").classList.toggle("warn",st.started&&rem<=3);
-  if(!busy)setLit(Math.ceil(N*Math.max(0,remMs)/(cur.dur*1000)));
+  if(!busy){const f=N*Math.max(0,remMs)/(cur.dur*1000);setLit(Math.ceil(f));setEdge(f)}
   const cr=cur.type==="cycleRest";
   setHTML($("cycleV"),digits(pad(S.cycles-cur.cycle+(cr?0:1))));
   setHTML($("roundV"),digits(pad(cr?0:S.rounds-cur.round+1)));
@@ -495,7 +514,7 @@ const EASE="cubic-bezier(.2,.8,.2,1)";
 const homeEls=()=>[$("secHead"),...$("rows").children,$("foot")];
 async function bootDial(){
   // the ring appears already full, with a quick fade
-  busy=true;const cur=Q[st.idx];setLit(cur?N:0);
+  busy=true;const cur=Q[st.idx];drawGlow();setLit(cur?N:0);setEdge(cur?N:0);
   if(!reduce)await $("dial").animate([{opacity:0},{opacity:1}],{duration:140,easing:"ease-out"}).finished;
   busy=false;
 }
