@@ -8,7 +8,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Interval">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#0D141D">
+<meta name="theme-color" content="#0B121A">
 <meta name="format-detection" content="telephone=no">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -21,14 +21,14 @@
 @font-face{font-family:"JetBrains Mono";src:url(fonts/JetBrainsMono-Medium.woff2) format("woff2");font-weight:400 600;font-display:swap}
 [hidden]{display:none!important}
 html,body{margin:0;overscroll-behavior:none}
-html{background:#0d141d}
+html{background:#0b121a}
 *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 /* Layout: retro-futurist field instrument. Home = big-number setup rows (tap → full-screen wheel editor).
    Start boots a 60-tick dial; Reset/Done powers it down back to the setup. Single deliberate dark look. */
 :root{
   color-scheme:dark;
   /* synced from Figma (Retro collection) */
-  --bg:#0d141d; --panel:#1a202a; --panel2:#2d303b; --raise:#1c1e26; --fg:#efe6d2; --muted:#8c8984; --dim:#363533; --line:rgba(239,230,210,.09);
+  --bg:#0b121a; --panel:#1a202a; --panel2:#2d303b; --raise:#1c1e26; --fg:#efe6d2; --muted:#8c8984; --dim:#363533; --line:rgba(239,230,210,.09);
   --yellow:#f2b43c; --red:#ea5a3c; --green:#7cb86a; --blue:#5f93d6;
   --phase:var(--yellow);
   --f-display:"Urbanist","Avenir Next","Century Gothic",system-ui,sans-serif;
@@ -36,7 +36,7 @@ html{background:#0d141d}
   --f-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
 }
 html,body{height:100%}
-body{background:#0d141d;touch-action:manipulation;display:flex;align-items:center;justify-content:center;color:var(--fg);font-family:var(--f-body);font-size:15px;
+body{background:#0b121a;touch-action:manipulation;display:flex;align-items:center;justify-content:center;color:var(--fg);font-family:var(--f-body);font-size:15px;
   padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);-webkit-tap-highlight-color:transparent;overflow:hidden}
 *{box-sizing:border-box}
 button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;padding:0}
@@ -84,9 +84,7 @@ header{display:flex;align-items:center;justify-content:space-between;min-height:
 .view{position:absolute;inset:0;display:flex;flex-direction:column}
 
 /* Home: big-number setup */
-.sec{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-.sec .mono{color:var(--dim)}
-.sec::after{content:"";flex:1;height:1px;background:var(--line)}
+.sec{height:1px;flex:none;background:var(--line);margin-bottom:12px}   /* plain hairline under the header */
 .rows{flex:1;display:flex;flex-direction:column;gap:8px;min-height:0}
 /* Card: dark panel, soft neutral stroke, full-height phase line on the left edge */
 .acard{position:relative;overflow:hidden;border-radius:10px;border:1px solid var(--line);
@@ -105,7 +103,7 @@ header{display:flex;align-items:center;justify-content:space-between;min-height:
 .row.count .val{color:var(--fg)}
 .row.dim{opacity:.35}
 .row .edit{width:7px;height:12px;color:var(--muted);flex:none;margin-left:4px}
-.foot{display:flex;justify-content:space-between;align-items:center;padding:12px 4px 0}
+.foot{display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding:12px 4px 0;border-top:1px solid var(--line)}
 .foot .total{font-size:20px;color:var(--fg)}
 
 /* Run: HUD + dial */
@@ -148,7 +146,7 @@ header{display:flex;align-items:center;justify-content:space-between;min-height:
 .controls{position:relative;height:68px;flex:none;display:flex;align-items:center;justify-content:center}
 /* CTA: built from 3 pieces (left cap, right cap, middle) that only move/scale, so the pill <-> circle morph
    runs on the GPU with no layout work. The 4 pt bg gap + 1 pt ring are drawn by each piece. */
-.cta{position:absolute;left:0;top:0;height:68px;width:100%;background:none;color:var(--bg);pointer-events:none;--dx:0px;--ring:#21272d;
+.cta{position:absolute;left:0;top:0;height:68px;width:100%;background:none;color:var(--bg);pointer-events:none;--dx:0px;--ring:#20252b;
   font-family:var(--f-display);font-weight:800;font-size:22px;line-height:1;letter-spacing:.14em;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:12px;
   touch-action:manipulation}
 .cta>i{position:absolute;top:0;pointer-events:auto;will-change:transform;transition:transform .45s cubic-bezier(.3,.7,.2,1)}
@@ -220,7 +218,7 @@ header{display:flex;align-items:center;justify-content:space-between;min-height:
 
   <div class="views">
     <section class="view" id="home" aria-label="Workout setup">
-      <div class="sec" id="secHead"><span class="mono">Loadout // Session</span></div>
+      <div class="sec" id="secHead"></div>
       <div class="rows" id="rows"></div>
       <div class="foot" id="foot"><span class="mono">Total runtime</span><span class="total" id="homeTotal"></span></div>
     </section>
@@ -468,7 +466,7 @@ function releaseWake(){keepAwakeVideo(false);try{wake&&wake.release()}catch(e){}
    Drawn on one canvas, and only when something visible changes (a bar, the edge fade step, the phase colour or the size).
    No SVG nodes, no blur, no per-frame style changes: cheap even on older iPhones. */
 const N=120, dialCv=$("dial"), dctx=dialCv.getContext("2d");
-let dialSize=[0,0,1], dialCols={on:"#f2b43c",off:"#1a202a",bg:"#0d141d"}, dialLit=N, dialEdge=N, dialKey="", dialPaths=[], dialPainted=[], dialBase="";
+let dialSize=[0,0,1], dialCols={on:"#f2b43c",off:"#1a202a",bg:"#0b121a"}, dialLit=N, dialEdge=N, dialKey="", dialPaths=[], dialPainted=[], dialBase="";
 function dialColors(){const cs=getComputedStyle(document.documentElement);
   dialCols.off=cs.getPropertyValue("--panel").trim();dialCols.bg=cs.getPropertyValue("--bg").trim();}
 function sizeDial(){const r=dialCv.getBoundingClientRect(),dpr=Math.min(3,window.devicePixelRatio||1);
