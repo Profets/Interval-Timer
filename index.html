@@ -127,18 +127,11 @@ header{display:flex;align-items:center;justify-content:space-between;min-height:
 .readout{line-height:12px;white-space:nowrap}
 .readout.tl{left:10px;top:8px}.readout.tr{right:10px;top:8px;text-align:right}.readout.bl{left:10px;bottom:8px}.readout.br{right:10px;bottom:8px;text-align:right}
 .readout b{color:var(--muted);font-weight:500}
-.dial{width:100%;height:100%;overflow:visible}
+.dial{position:absolute;inset:0;width:100%;height:100%}
 /* Uniform square-cut segments; the gaps are a background-coloured stroke so they keep a constant width */
 /* Thin ring: continuous dark track; only the lit part is split into segments, with phosphor bloom */
-.dial .track{display:none}
 /* 120 thin bars all round; the gaps are a background-coloured stroke so they stay a constant width */
-.dial .tk{fill:var(--panel);stroke:var(--bg);stroke-width:2.6;stroke-linejoin:miter}
-.dglow{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;opacity:.15;
-  -webkit-mask-image:conic-gradient(from 0deg at 50% 50%,#000 0deg var(--gdeg,360deg),transparent var(--gdeg,360deg));mask-image:conic-gradient(from 0deg at 50% 50%,#000 0deg var(--gdeg,360deg),transparent var(--gdeg,360deg))}
-.dial .tk.on{fill:var(--phase)}
-.dial .lit{filter:none}
 /* Glow: a blurred copy of only the lit bars (fill only, no stroke) laid OVER the ring, so it also softly tints the dark gaps */
-.dial .face{fill:none}
 .dialin{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center}
 .phase{display:flex;align-items:center;gap:8px;padding:6px 16px;border-radius:999px;background:var(--phase);color:var(--bg);box-shadow:0 0 16px color-mix(in srgb,var(--phase) 20%,transparent);
   font-family:var(--f-display);font-weight:800;font-size:17.5px;letter-spacing:.1em;text-transform:uppercase;transition:background-color .3s}
@@ -224,7 +217,7 @@ header{display:flex;align-items:center;justify-content:space-between;min-height:
         <div><span class="mono">Rounds</span><span id="roundV"></span></div>
         <div><span class="mono">Cycles</span><span id="cycleV"></span></div>
       </div>
-      <div class="dialwrap"><svg class="dial" id="dial" viewBox="0 0 300 300" aria-hidden="true"></svg>
+      <div class="dialwrap"><canvas class="dial" id="dial" aria-hidden="true"></canvas>
         <i class="cn tl"></i><i class="cn tr"></i><i class="cn bl"></i><i class="cn br"></i>
         <span class="readout tl">SEQ <b id="seq">01/19</b></span><span class="readout tr" id="phCode">PH-00</span>
         <span class="readout bl">ELAPSED <b id="elapsed">00:00</b></span><span class="readout br">SIG <b>OK</b></span>
@@ -398,10 +391,16 @@ function pickVoice(){try{
 try{pickVoice();speechSynthesis.onvoiceschanged=pickVoice}catch(e){}
 /* Ducking: while the voice speaks, the effects drop further so the words stay on top */
 function duck(on){if(master&&actx)master.gain.setTargetAtTime(on?MASTER*.4:MASTER,actx.currentTime,.06)}
-function say(text){if(!S.voice)return;try{speechSynthesis.cancel();speechSynthesis.resume();const u=new SpeechSynthesisUtterance(text);u.lang="en-US";if(enVoice)u.voice=enVoice;u.rate=1.05;u.volume=1;
-  u.onstart=()=>duck(true);u.onend=u.onerror=()=>duck(false);setTimeout(()=>speechSynthesis.speak(u),40)}catch(e){}}
+function say(text){if(!S.voice)return;try{
+  if(speechSynthesis.speaking||speechSynthesis.pending)speechSynthesis.cancel();   // cancel only when needed: it adds delay on iOS
+  const u=new SpeechSynthesisUtterance(text);u.lang="en-US";if(enVoice)u.voice=enVoice;u.rate=1.1;u.volume=1;
+  u.onstart=()=>duck(true);u.onend=u.onerror=()=>duck(false);speechSynthesis.speak(u)}catch(e){}}
 function speak(key,text){say(text)}
-function announce(type){SFX[phaseSfx[type]]();speak(type,META[type].say)}
+const VOICE_LEAD=.32;   // seconds: iOS speech starts ~0.3 s after it is asked to
+function announce(type){SFX[phaseSfx[type]]();if(st.spoken!==st.idx){st.spoken=st.idx;speak(type,META[type].say)}}
+function preSpeak(){ // called every frame: queue the next phase's word just before the change
+  if(!S.voice||st.spoken===st.idx+1)return;const left=Q[st.idx].dur-st.elapsed/1000;if(left>VOICE_LEAD)return;
+  st.spoken=st.idx+1;if(st.idx+1<Q.length)speak(Q[st.idx+1].type,META[Q[st.idx+1].type].say);else speak("done","Workout complete")}
 let wake=null;
 /* Keep the screen on: Wake Lock API where it works, plus a tiny muted looping video (reliable on iOS home-screen apps) */
 let keepVid=null;
@@ -415,42 +414,31 @@ function keepAwakeVideo(on){
 async function holdWake(){keepAwakeVideo(true);try{wake=await navigator.wakeLock?.request("screen")}catch(e){wake=null}}
 function releaseWake(){keepAwakeVideo(false);try{wake&&wake.release()}catch(e){}wake=null}
 
-/* ---------- Dial ----------
-   Performance: the bars are plain SVG paths (only class changes); the glow is a canvas painted ONCE per phase
-   and revealed with a conic mask, so nothing is re-blurred while the timer runs. The edge bar fades smoothly. */
-const N=120, ticks=[];
-let glowCv=null;
-(function(){const ns="http://www.w3.org/2000/svg",svg=$("dial");
-  const g=document.createElementNS(ns,"g");g.setAttribute("class","lit");svg.appendChild(g);
-  const r1=126,r2=147,P=(r,a)=>(150+r*Math.cos(a)).toFixed(2)+" "+(150+r*Math.sin(a)).toFixed(2);
+/* ---------- Dial (canvas) ----------
+   Drawn on one canvas, and only when something visible changes (a bar, the edge fade step, the phase colour or the size).
+   No SVG nodes, no blur, no per-frame style changes: cheap even on older iPhones. */
+const N=120, dialCv=$("dial"), dctx=dialCv.getContext("2d");
+let dialSize=[0,0,1], dialCols={on:"#f2b43c",off:"#16181d",bg:"#0b0c0f"}, dialLit=N, dialEdge=N, dialKey="";
+function dialColors(){const cs=getComputedStyle(document.documentElement);
+  dialCols.off=cs.getPropertyValue("--panel").trim();dialCols.bg=cs.getPropertyValue("--bg").trim();}
+function sizeDial(){const r=dialCv.getBoundingClientRect(),dpr=Math.min(3,window.devicePixelRatio||1);
+  const W=Math.round(r.width*dpr),H=Math.round(r.height*dpr);if(W&&H&&(W!==dialCv.width||H!==dialCv.height)){dialCv.width=W;dialCv.height=H}dialSize=[W,H,dpr];dialKey=""}
+function mix(a,b,t){const h=x=>[1,3,5].map(i=>parseInt(x.slice(i,i+2),16));const A=h(a),B=h(b);return "rgb("+A.map((v,i)=>Math.round(v*t+B[i]*(1-t))).join(",")+")"}
+function drawDial(){
+  const [W,H]=dialSize;if(!W||!H)return;
+  const step=Math.round((dialEdge-Math.floor(dialEdge))*12),key=dialLit+"|"+step+"|"+dialCols.on+"|"+W;if(key===dialKey)return;dialKey=key;
+  const s=Math.min(W,H)/300,cx=W/2,cy=H/2,r1=126*s,r2=147*s;
+  dctx.clearRect(0,0,W,H);dctx.lineWidth=2.6*s;dctx.strokeStyle=dialCols.bg;dctx.lineJoin="miter";
+  const edge=dialLit-1,frac=dialEdge-Math.floor(dialEdge);
   for(let i=0;i<N;i++){const a0=i/N*2*Math.PI-Math.PI/2,a1=(i+1)/N*2*Math.PI-Math.PI/2;
-    const p=document.createElementNS(ns,"path");p.setAttribute("class","tk");
-    p.setAttribute("d","M"+P(r1,a0)+" L"+P(r2,a0)+" A"+r2+" "+r2+" 0 0 1 "+P(r2,a1)+" L"+P(r1,a1)+" A"+r1+" "+r1+" 0 0 0 "+P(r1,a0)+"Z");
-    g.appendChild(p);ticks.push(p)}
-  glowCv=document.createElement("canvas");glowCv.className="dglow";glowCv.setAttribute("aria-hidden","true");svg.after(glowCv);
-})();
-let glowColor="";
-function drawGlow(color){
-  if(!glowCv)return;glowColor=color||glowColor;const box=glowCv.parentElement.getBoundingClientRect();
-  const dpr=Math.min(3,window.devicePixelRatio||1),W=Math.round(box.width*dpr),H=Math.round(box.height*dpr);
-  if(!W||!H)return;glowCv.width=W;glowCv.height=H;const ctx=glowCv.getContext("2d");ctx.clearRect(0,0,W,H);
-  if(!glowColor)return;
-  const s=Math.min(W,H)/300,cx=W/2,cy=H/2,OFF=W*4,r1=126*s,r2=147*s;
-  ctx.fillStyle="#000";ctx.shadowColor=glowColor;ctx.shadowBlur=16*s;ctx.shadowOffsetX=OFF;   // draw only the shadow, off-canvas shapes
-  for(let i=0;i<N;i++){const a0=i/N*2*Math.PI-Math.PI/2,a1=(i+1)/N*2*Math.PI-Math.PI/2-.012;
-    ctx.beginPath();ctx.arc(cx-OFF,cy,r2,a0,a1);ctx.arc(cx-OFF,cy,r1,a1,a0,true);ctx.closePath();ctx.fill()}
+    dctx.beginPath();dctx.arc(cx,cy,r2,a0,a1);dctx.arc(cx,cy,r1,a1,a0,true);dctx.closePath();
+    dctx.fillStyle=i<dialLit?(i===edge&&frac>0&&frac<.999&&/^#/.test(dialCols.on)?mix(dialCols.on,dialCols.off,frac):dialCols.on):dialCols.off;
+    dctx.fill();dctx.stroke()}
 }
-addEventListener("resize",()=>drawGlow());
-let litCount=-1, edgeIdx=-1;
-function setLit(n){
-  if(n!==litCount){litCount=n;ticks.forEach((t,i)=>t.classList.toggle("on",i<n));
-    if(glowCv)glowCv.style.setProperty("--gdeg",(n/N*360).toFixed(2)+"deg")}
-}
-function setEdge(f){   // f = exact lit amount; the last lit bar fades from phase colour to panel
-  const n=Math.ceil(f),i=n-1,frac=f-Math.floor(f)||1;
-  if(edgeIdx!==i&&edgeIdx>=0&&ticks[edgeIdx])ticks[edgeIdx].style.fill="";
-  edgeIdx=i;if(i>=0&&ticks[i])ticks[i].style.fill=frac>=.999?"":"color-mix(in srgb,var(--phase) "+(frac*100).toFixed(0)+"%,var(--panel))";
-}
+function drawGlow(){sizeDial();dialColors();drawDial()}   /* kept name: (re)measure + redraw */
+addEventListener("resize",()=>{sizeDial();drawDial()});
+function setLit(n){dialLit=n;dialEdge=n;drawDial()}
+function setEdge(f){dialLit=Math.ceil(f);dialEdge=f;drawDial()}
 
 /* ---------- Timer ---------- */
 function resetState(){Q=build(S);st={idx:0,elapsed:0,running:false,started:false,done:false,last:0,lastRem:null,tickT:0}}
@@ -462,6 +450,7 @@ function loop(now){
     if(st.idx>=Q.length)finish();
     else{
       if(changed)announce(Q[st.idx].type);
+      preSpeak();
       const rem=Math.ceil((Q[st.idx].dur*1000-st.elapsed)/1000);
       if(rem!==st.lastRem){if(st.lastRem!==null&&rem<=3&&rem>=1&&S.beeps)SFX.count(rem);st.lastRem=rem}
       if(st.tickT>=500){st.tickT%=500;if(S.tick)SFX.tick()}
@@ -470,9 +459,12 @@ function loop(now){
   }
   requestAnimationFrame(loop);
 }
-function finish(){st.running=false;st.done=true;st.idx=Q.length;releaseWake();SFX.done();speak("done","Workout complete");renderRun();renderControls()}
-function setPhase(type){rootStyle.setProperty("--phase",type?"var("+META[type].c+")":"var(--fg)");
-  const col=type?getComputedStyle(document.documentElement).getPropertyValue(META[type].c).trim():"";if(col!==glowColor||!type){glowColor=col;drawGlow(col)}}
+function finish(){st.running=false;st.done=true;st.idx=Q.length;releaseWake();SFX.done();if(st.spoken!==Q.length)speak("done","Workout complete");renderRun();renderControls()}
+let curPhase="?";
+function setPhase(type){if(type===curPhase)return;curPhase=type;   // touching the root style every frame forced a full restyle
+  rootStyle.setProperty("--phase",type?"var("+META[type].c+")":"var(--fg)");
+  dialCols.on=getComputedStyle(document.documentElement).getPropertyValue(type?META[type].c:"--fg").trim();dialKey="";}
+let nextC="";function setNextC(v){if(v!==nextC){nextC=v;$("nextBox").style.setProperty("--c",v)}}
 function renderRun(){
   const cur=Q[st.idx], nxt=Q[st.idx+1];
   if(st.done||!cur){
@@ -492,8 +484,8 @@ function renderRun(){
   setText($("seq"),pad(st.idx+1)+"/"+pad(Q.length));setText($("phCode"),META[cur.type].code);
   setText($("elapsed"),fmt(Math.floor(totalOf(Q)-left)));
   $("nextBox").style.visibility="visible";
-  if(nxt){$("nextBox").style.setProperty("--c","var("+META[nxt.type].c+")");setText($("nextName"),META[nxt.type].name);setHTML($("nextTime"),digits(fmt(nxt.dur)))}
-  else{$("nextBox").style.setProperty("--c","var(--fg)");setText($("nextName"),"Finish");setHTML($("nextTime"),"")}
+  if(nxt){setNextC("var("+META[nxt.type].c+")");setText($("nextName"),META[nxt.type].name);setHTML($("nextTime"),digits(fmt(nxt.dur)))}
+  else{setNextC("var(--fg)");setText($("nextName"),"Finish");setHTML($("nextTime"),"")}
 }
 const ICON={
   play:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12.4-7.5a1 1 0 0 0 0-1.72L8.5 3.64A1 1 0 0 0 7 4.5z"/></svg>',
