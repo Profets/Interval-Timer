@@ -141,11 +141,19 @@ header{display:flex;align-items:center;justify-content:space-between;min-height:
 
 /* Controls */
 .controls{position:relative;height:68px;flex:none;display:flex;align-items:center;justify-content:center}
-.cta{position:absolute;left:50%;transform:translateX(-50%);height:68px;width:100%;border-radius:34px;background:var(--fg);color:var(--bg);overflow:hidden;
+/* CTA: built from 3 pieces (left cap, right cap, middle) that only move/scale, so the pill <-> circle morph
+   runs on the GPU with no layout work. The 4 pt bg gap + 1 pt ring are drawn by each piece. */
+.cta{position:absolute;left:0;top:0;height:68px;width:100%;background:none;color:var(--bg);pointer-events:none;--dx:0px;--ring:#202021;
   font-family:var(--f-display);font-weight:800;font-size:22px;line-height:1;letter-spacing:.14em;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:12px;
-  box-shadow:0 0 0 4px var(--bg),0 0 0 5px var(--line);
-  transition:width .45s cubic-bezier(.3,.7,.2,1),height .45s,border-radius .45s;touch-action:manipulation}
-.cta.compact{width:64px;height:64px;border-radius:32px}
+  touch-action:manipulation}
+.cta>i{position:absolute;top:0;pointer-events:auto;will-change:transform;transition:transform .45s cubic-bezier(.3,.7,.2,1)}
+.cta .cl,.cta .cr{width:68px;height:68px;border-radius:50%;background:var(--fg);box-shadow:0 0 0 4px var(--bg),0 0 0 5px var(--ring)}
+.cta .cl{left:0}.cta .cr{right:0}
+.cta .cm{left:34px;right:34px;top:-5px;height:78px;background:linear-gradient(var(--ring) 0 1px,var(--bg) 1px 5px,var(--fg) 5px 73px,var(--bg) 73px 77px,var(--ring) 77px)}
+.cta.compact .cl{transform:translateX(var(--dx)) scale(.941)}
+.cta.compact .cr{transform:translateX(calc(-1 * var(--dx))) scale(.941)}
+.cta.compact .cm{transform:scale(0,.941)}
+#ctaIcon,.cta-label{position:relative;z-index:1}
 .cta.compact .cta-label{display:none}
 .cta svg,.cta span{pointer-events:none}
 #ctaIcon{display:flex;align-items:center}
@@ -233,7 +241,7 @@ header{display:flex;align-items:center;justify-content:space-between;min-height:
 
   <div class="controls">
     <button class="reset" id="resetBtn" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M4 12a8 8 0 1 0 2.5-5.8M4 4v4h4"/></svg>Reset</button>
-    <button class="cta" id="cta"><span id="ctaIcon"></span><span class="cta-label" id="ctaLabel">Start</span></button>
+    <button class="cta" id="cta"><i class="cl"></i><i class="cr"></i><i class="cm"></i><span id="ctaIcon"></span><span class="cta-label" id="ctaLabel">Start</span></button>
   </div>
 </div>
 
@@ -391,15 +399,27 @@ function pickVoice(){try{
 try{pickVoice();speechSynthesis.onvoiceschanged=pickVoice}catch(e){}
 /* Ducking: while the voice speaks, the effects drop further so the words stay on top */
 function duck(on){if(master&&actx)master.gain.setTargetAtTime(on?MASTER*.4:MASTER,actx.currentTime,.06)}
+function makeUtter(text){const u=new SpeechSynthesisUtterance(text);u.lang="en-US";if(enVoice)u.voice=enVoice;u.rate=1.1;u.volume=1;
+  u.onstart=()=>duck(true);u.onend=u.onerror=()=>duck(false);return u}
+let readyUtter=null;   // the next line, built in advance so nothing is created at the moment it must be spoken
+function prepareUtter(text){try{if(S.voice&&(!readyUtter||readyUtter.text!==text))readyUtter=makeUtter(text)}catch(e){}}
 function say(text){if(!S.voice)return;try{
   if(speechSynthesis.speaking||speechSynthesis.pending)speechSynthesis.cancel();   // cancel only when needed: it adds delay on iOS
-  const u=new SpeechSynthesisUtterance(text);u.lang="en-US";if(enVoice)u.voice=enVoice;u.rate=1.1;u.volume=1;
-  u.onstart=()=>duck(true);u.onend=u.onerror=()=>duck(false);speechSynthesis.speak(u)}catch(e){}}
+  const u=readyUtter&&readyUtter.text===text?readyUtter:makeUtter(text);readyUtter=null;speechSynthesis.speak(u)}catch(e){}}
 function speak(key,text){say(text)}
 const VOICE_LEAD=.32;   // seconds: iOS speech starts ~0.3 s after it is asked to
 function announce(type){SFX[phaseSfx[type]]();if(st.spoken!==st.idx){st.spoken=st.idx;speak(type,META[type].say)}}
-function preSpeak(){ // called every frame: queue the next phase's word just before the change
-  if(!S.voice||st.spoken===st.idx+1)return;const left=Q[st.idx].dur-st.elapsed/1000;if(left>VOICE_LEAD)return;
+function nextLine(){return st.idx+1<Q.length?META[Q[st.idx+1].type].say:"Workout complete"}
+/* The next word is spoken by its own timer, set when a phase starts or resumes: it fires on time even if a frame is late.
+   preSpeak() in the frame loop stays as a safety net. */
+let voiceTimer=0,voiceFor=-1;
+function scheduleVoice(){
+  if(!st.running||!S.voice||st.idx>=Q.length){if(voiceFor!==-1){clearTimeout(voiceTimer);voiceFor=-1}return}
+  if(voiceFor===st.idx)return;clearTimeout(voiceTimer);voiceFor=st.idx;prepareUtter(nextLine());
+  const i=st.idx,wait=(Q[i].dur-st.elapsed/1000-VOICE_LEAD)*1000;
+  voiceTimer=setTimeout(()=>{if(st.running&&st.idx===i)preSpeak(true)},Math.max(0,wait))}
+function preSpeak(now){ // queue the next phase's word just before the change
+  if(!S.voice||st.spoken===st.idx+1)return;const left=Q[st.idx].dur-st.elapsed/1000;if(!now&&left>VOICE_LEAD)return;
   st.spoken=st.idx+1;if(st.idx+1<Q.length)speak(Q[st.idx+1].type,META[Q[st.idx+1].type].say);else speak("done","Workout complete")}
 let wake=null;
 /* Keep the screen on: Wake Lock API where it works, plus a tiny muted looping video (reliable on iOS home-screen apps) */
@@ -418,22 +438,26 @@ function releaseWake(){keepAwakeVideo(false);try{wake&&wake.release()}catch(e){}
    Drawn on one canvas, and only when something visible changes (a bar, the edge fade step, the phase colour or the size).
    No SVG nodes, no blur, no per-frame style changes: cheap even on older iPhones. */
 const N=120, dialCv=$("dial"), dctx=dialCv.getContext("2d");
-let dialSize=[0,0,1], dialCols={on:"#f2b43c",off:"#16181d",bg:"#0b0c0f"}, dialLit=N, dialEdge=N, dialKey="";
+let dialSize=[0,0,1], dialCols={on:"#f2b43c",off:"#16181d",bg:"#0b0c0f"}, dialLit=N, dialEdge=N, dialKey="", dialPaths=[], dialPainted=[], dialBase="";
 function dialColors(){const cs=getComputedStyle(document.documentElement);
   dialCols.off=cs.getPropertyValue("--panel").trim();dialCols.bg=cs.getPropertyValue("--bg").trim();}
 function sizeDial(){const r=dialCv.getBoundingClientRect(),dpr=Math.min(3,window.devicePixelRatio||1);
-  const W=Math.round(r.width*dpr),H=Math.round(r.height*dpr);if(W&&H&&(W!==dialCv.width||H!==dialCv.height)){dialCv.width=W;dialCv.height=H}dialSize=[W,H,dpr];dialKey=""}
+  const W=Math.round(r.width*dpr),H=Math.round(r.height*dpr);if(W&&H&&(W!==dialCv.width||H!==dialCv.height)){dialCv.width=W;dialCv.height=H}dialSize=[W,H,dpr];dialKey="";dialBase="";
+  const s=Math.min(W,H)/300,cx=W/2,cy=H/2,r1=126*s,r2=147*s;dialPaths=[];
+  for(let i=0;i<N;i++){const a0=i/N*2*Math.PI-Math.PI/2,a1=(i+1)/N*2*Math.PI-Math.PI/2,p=new Path2D();
+    p.arc(cx,cy,r2,a0,a1);p.arc(cx,cy,r1,a1,a0,true);p.closePath();dialPaths.push(p)}}
 function mix(a,b,t){const h=x=>[1,3,5].map(i=>parseInt(x.slice(i,i+2),16));const A=h(a),B=h(b);return "rgb("+A.map((v,i)=>Math.round(v*t+B[i]*(1-t))).join(",")+")"}
 function drawDial(){
-  const [W,H]=dialSize;if(!W||!H)return;
+  const [W,H]=dialSize;if(!W||!H||!dialPaths.length)return;
   const step=Math.round((dialEdge-Math.floor(dialEdge))*12),key=dialLit+"|"+step+"|"+dialCols.on+"|"+W;if(key===dialKey)return;dialKey=key;
-  const s=Math.min(W,H)/300,cx=W/2,cy=H/2,r1=126*s,r2=147*s;
-  dctx.clearRect(0,0,W,H);dctx.lineWidth=2.6*s;dctx.strokeStyle=dialCols.bg;dctx.lineJoin="miter";
-  const edge=dialLit-1,frac=dialEdge-Math.floor(dialEdge);
-  for(let i=0;i<N;i++){const a0=i/N*2*Math.PI-Math.PI/2,a1=(i+1)/N*2*Math.PI-Math.PI/2;
-    dctx.beginPath();dctx.arc(cx,cy,r2,a0,a1);dctx.arc(cx,cy,r1,a1,a0,true);dctx.closePath();
-    dctx.fillStyle=i<dialLit?(i===edge&&frac>0&&frac<.999&&/^#/.test(dialCols.on)?mix(dialCols.on,dialCols.off,frac):dialCols.on):dialCols.off;
-    dctx.fill();dctx.stroke()}
+  const s=Math.min(W,H)/300,edge=dialLit-1,frac=step/12,base=dialCols.on+"|"+dialCols.off+"|"+W;
+  dctx.lineWidth=2.6*s;dctx.strokeStyle=dialCols.bg;dctx.lineJoin="miter";
+  const full=base!==dialBase;if(full){dialBase=base;dctx.clearRect(0,0,W,H);dialPainted=[]}
+  for(let i=0;i<N;i++){
+    const c=i<dialLit?(i===edge&&frac>0&&frac<1&&/^#/.test(dialCols.on)?mix(dialCols.on,dialCols.off,frac):dialCols.on):dialCols.off;
+    if(c===dialPainted[i])continue;dialPainted[i]=c;const p=dialPaths[i];
+    if(!full){dctx.fillStyle=dialCols.bg;dctx.fill(p)}   // wipe the old colour (incl. its soft edge) before repainting this bar
+    dctx.fillStyle=c;dctx.fill(p);dctx.stroke(p)}
 }
 function drawGlow(){sizeDial();dialColors();drawDial()}   /* kept name: (re)measure + redraw */
 addEventListener("resize",()=>{sizeDial();drawDial()});
@@ -450,13 +474,13 @@ function loop(now){
     if(st.idx>=Q.length)finish();
     else{
       if(changed)announce(Q[st.idx].type);
-      preSpeak();
+      scheduleVoice();preSpeak();
       const rem=Math.ceil((Q[st.idx].dur*1000-st.elapsed)/1000);
       if(rem!==st.lastRem){if(st.lastRem!==null&&rem<=3&&rem>=1&&S.beeps)SFX.count(rem);st.lastRem=rem}
       if(st.tickT>=500){st.tickT%=500;if(S.tick)SFX.tick()}
     }
     renderRun();
-  }
+  }else if(voiceFor!==-1)scheduleVoice();   // paused/stopped: cancel the pending voice timer
   requestAnimationFrame(loop);
 }
 function finish(){st.running=false;st.done=true;st.idx=Q.length;releaseWake();SFX.done();if(st.spoken!==Q.length)speak("done","Workout complete");renderRun();renderControls()}
@@ -464,7 +488,7 @@ let curPhase="?";
 function setPhase(type){if(type===curPhase)return;curPhase=type;   // touching the root style every frame forced a full restyle
   rootStyle.setProperty("--phase",type?"var("+META[type].c+")":"var(--fg)");
   dialCols.on=getComputedStyle(document.documentElement).getPropertyValue(type?META[type].c:"--fg").trim();dialKey="";}
-let runKey="",nextVis=null;function setNextVis(v){if(v!==nextVis){nextVis=v;$("nextBox").style.visibility=v?"visible":"hidden"}}
+let runKey="",nextVis=null,dialT=0;function setNextVis(v){if(v!==nextVis){nextVis=v;$("nextBox").style.visibility=v?"visible":"hidden"}}
 let nextC="";function setNextC(v){if(v!==nextC){nextC=v;$("nextBox").style.setProperty("--c",v)}}
 function renderRun(){
   const cur=Q[st.idx], nxt=Q[st.idx+1];
@@ -476,7 +500,8 @@ function renderRun(){
   const remMs=cur.dur*1000-st.elapsed, rem=Math.ceil(remMs/1000);
   const key=st.idx+"|"+rem+"|"+st.started, changed=key!==runKey;
   if(changed)setPhase(cur.type);
-  if(!busy){const f=N*Math.max(0,remMs)/(cur.dur*1000);setEdge(f)}       // the only per-frame work: the ring (canvas, redrawn only if it changed)
+  const t=performance.now();
+  if(!busy&&(changed||t-dialT>=32)){dialT=t;const f=N*Math.max(0,remMs)/(cur.dur*1000);setEdge(f)}   // ring: at most 30 times a second, only changed bars
   if(!changed)return;runKey=key;   // everything below runs once per second
   setText($("phaseName"),META[cur.type].name);
   setHTML($("bigTime"),digits(fmt(rem)));$("bigTime").classList.toggle("warn",st.started&&rem<=3);
@@ -496,6 +521,8 @@ const ICON={
   pause:'<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>',
   check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>'
 };
+function sizeCta(){const c=$("cta");c.style.setProperty("--dx",(c.clientWidth/2-34)+"px")}
+addEventListener("resize",sizeCta);
 function renderControls(){
   const cta=$("cta"),live=mode==="run"&&!st.done;
   cta.classList.toggle("compact",live);
@@ -634,7 +661,7 @@ $("soundBtn").addEventListener("click",()=>{
   },"Version 1.0 · Made by Profets",null);
 });
 
-resetState();paintHome();renderControls();requestAnimationFrame(loop);
+resetState();paintHome();sizeCta();renderControls();requestAnimationFrame(loop);
 </script>
 <script>
 if("serviceWorker" in navigator){addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}))}
