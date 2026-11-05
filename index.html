@@ -130,11 +130,17 @@ header{display:flex;align-items:center;justify-content:space-between;min-height:
 /* 120 thin bars all round; the gaps are a background-coloured stroke so they stay a constant width */
 /* Glow: a blurred copy of only the lit bars (fill only, no stroke) laid OVER the ring, so it also softly tints the dark gaps */
 .dialin{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center}
-.phase{display:flex;align-items:center;gap:8px;padding:6px 16px;border-radius:999px;background:var(--phase);color:var(--bg);box-shadow:0 0 16px color-mix(in srgb,var(--phase) 20%,transparent);
-  font-family:var(--f-display);font-weight:800;font-size:20px;letter-spacing:.1em;text-transform:uppercase;transition:background-color .3s}
+/* Phase pill: its colour + glow are pre-made textures (one per phase, made once at start-up), stacked behind the
+   text and cross-faded with opacity only, so changing phase costs no repaint. Fallback colour if textures are missing. */
+.phase{position:relative;z-index:0;display:flex;align-items:center;height:36px;box-sizing:border-box;padding:0 16px;border-radius:999px;background:var(--phase);color:var(--bg);
+  font-family:var(--f-display);font-weight:800;font-size:20px;line-height:24px;letter-spacing:.1em;text-transform:uppercase}
+.phase.tex{background:none}
+.phase .pg{position:absolute;inset:-24px;z-index:-1;pointer-events:none;opacity:0;transition:opacity .3s;will-change:opacity;
+  border:42px solid transparent;border-image-slice:var(--sl) fill;border-image-width:42px;border-image-repeat:stretch}
+.phase .pg.on{opacity:1}
 .phase::before{content:none}
 .big{font-size:clamp(60px,24cqw,92px);line-height:1;color:var(--fg)}
-.big.warn{color:var(--phase)}
+.big.warn{color:var(--phase,var(--fg))}
 /* Next: the same card as the setup rows, just shorter */
 .next{display:flex;align-items:center;gap:14px;padding:12px 18px;min-height:60px}
 .next .val{margin-left:auto;font-size:30px;line-height:1}
@@ -230,7 +236,7 @@ header{display:flex;align-items:center;justify-content:space-between;min-height:
         <span class="readout tl">SEQ <b id="seq">01/19</b></span><span class="readout tr" id="phCode">PH-00</span>
         <span class="readout bl">ELAPSED <b id="elapsed">00:00</b></span><span class="readout br">SIG <b>OK</b></span>
         <div class="dialin">
-          <span class="phase" id="phaseName">Prepare</span>
+          <span class="phase" id="phaseName"><span id="phaseTxt">Prepare</span></span>
           <span class="big" id="bigTime"></span>
           <span class="mono" id="remaining"></span>
         </div>
@@ -322,32 +328,60 @@ function ensureAudio(){
     }
     if(actx.state!=="running")actx.resume().catch(()=>{});
     const b=actx.createBuffer(1,1,22050),s=actx.createBufferSource();s.buffer=b;s.connect(actx.destination);s.start(0);
+    prerender();
   }catch(e){}
   if(!voiceUnlocked){try{const u=new SpeechSynthesisUtterance(" ");u.volume=0;speechSynthesis.speak(u);voiceUnlocked=true}catch(e){}}
 }
 ["pointerdown","keydown"].forEach(ev=>document.addEventListener(ev,ensureAudio,{capture:true,passive:true}));
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&actx&&actx.state!=="running")actx.resume().catch(()=>{})});
 /* One voice: two slightly detuned oscillators → resonant low-pass with its own envelope → amp envelope */
+let REC=null;   // when set, blip() draws into an offline context (pre-rendering) instead of playing live
 function blip({f=440,f2=null,type="square",dur=.12,vol=.2,cut=2400,cut2=null,q=6,detune=7,at=0,glide=null}){
-  if(!actx||!master)return;if(actx.state!=="running")actx.resume().catch(()=>{});
-  const t=actx.currentTime+at, g=actx.createGain(), lp=actx.createBiquadFilter();
+  const ctx=REC?REC.ctx:actx, out=REC?REC.ctx.destination:master&&master._in;
+  if(!ctx||!out)return;if(!REC&&actx.state!=="running")actx.resume().catch(()=>{});
+  const t=(REC?0:actx.currentTime)+at, g=ctx.createGain(), lp=ctx.createBiquadFilter();
   lp.type="lowpass";lp.Q.value=q;lp.frequency.setValueAtTime(cut,t);if(cut2)lp.frequency.exponentialRampToValueAtTime(cut2,t+dur);
   g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(vol,t+.006);g.gain.exponentialRampToValueAtTime(.0001,t+dur);
-  lp.connect(g).connect(master._in);
-  for(const d of [-detune,detune]){const o=actx.createOscillator();o.type=type;o.detune.value=d;o.frequency.setValueAtTime(f,t);
+  lp.connect(g).connect(out);
+  for(const d of [-detune,detune]){const o=ctx.createOscillator();o.type=type;o.detune.value=d;o.frequency.setValueAtTime(f,t);
     if(f2)o.frequency.exponentialRampToValueAtTime(f2,t+(glide||dur));o.connect(lp);o.start(t);o.stop(t+dur+.03)}
 }
+/* Timer sounds, defined once. They are pre-rendered into audio buffers at the first tap, so during the workout
+   playing one is a single buffer node instead of building oscillators and filters at that exact moment. */
+const SYNTH={
+  tickA:[.06,()=>blip({f:1900,type:"square",dur:.028,vol:.06,cut:3200,q:2,detune:0})],
+  tickB:[.06,()=>blip({f:1750,type:"square",dur:.028,vol:.06,cut:3200,q:2,detune:0})],
+  count:[.22,()=>blip({f:587,f2:600,type:"square",dur:.16,vol:.22,cut:3000,cut2:900,q:9})],
+  count1:[.22,()=>blip({f:880,f2:900,type:"square",dur:.16,vol:.22,cut:3000,cut2:900,q:9})],
+  work:[.42,()=>[523,659,784].forEach((f,i)=>blip({f,type:"sawtooth",dur:.18,vol:.16,cut:1200,cut2:4200,q:7,at:i*.07}))],
+  rest:[.48,()=>[784,659,523].forEach((f,i)=>blip({f,type:"triangle",dur:.22,vol:.2,cut:2600,cut2:700,q:5,at:i*.08}))],
+  macro:[.68,()=>{blip({f:196,f2:392,type:"sawtooth",dur:.6,vol:.16,cut:400,cut2:2600,q:12,glide:.45});blip({f:294,f2:588,type:"square",dur:.6,vol:.08,cut:500,cut2:2000,q:8,glide:.45})}],
+  prep:[.34,()=>blip({f:330,f2:660,type:"square",dur:.28,vol:.14,cut:800,cut2:3200,q:10})],
+  done:[.88,()=>[392,523,659,1046].forEach((f,i)=>blip({f,type:"square",dur:.5,vol:.12,cut:900,cut2:3600,q:8,at:i*.09}))]
+};
+const BUF={};let prerendered=false;
+function prerender(){if(prerendered||!actx)return;prerendered=true;
+  const OC=window.OfflineAudioContext||window.webkitOfflineAudioContext;if(!OC)return;
+  Object.keys(SYNTH).forEach((k,i)=>setTimeout(()=>{try{   // one per task, so the first tap stays instant
+    const [dur,fn]=SYNTH[k],sr=actx.sampleRate,oc=new OC(1,Math.ceil(sr*dur),sr);
+    REC={ctx:oc};try{fn()}finally{REC=null}
+    const done=b=>{if(b)BUF[k]=b};const pr=oc.startRendering();if(pr&&pr.then)pr.then(done).catch(()=>{});else oc.oncomplete=e=>done(e.renderedBuffer);
+  }catch(e){REC=null}},30*i))}
+function play(k){
+  if(!actx||!master)return;if(actx.state!=="running")actx.resume().catch(()=>{});
+  const b=BUF[k];if(!b){SYNTH[k][1]();return}   // not ready yet: synthesize live (same sound)
+  const src=actx.createBufferSource();src.buffer=b;src.connect(master._in);src.start()}
 const SFX={
-  tick(){tickAlt=!tickAlt;blip({f:tickAlt?1900:1750,type:"square",dur:.028,vol:.06,cut:3200,q:2,detune:0})},
-  count(n){blip({f:n===1?880:587,f2:n===1?900:600,type:"square",dur:.16,vol:.22,cut:3000,cut2:900,q:9})},
-  work(){[523,659,784].forEach((f,i)=>blip({f,type:"sawtooth",dur:.18,vol:.16,cut:1200,cut2:4200,q:7,at:i*.07}))},
-  rest(){[784,659,523].forEach((f,i)=>blip({f,type:"triangle",dur:.22,vol:.2,cut:2600,cut2:700,q:5,at:i*.08}))},
-  macro(){blip({f:196,f2:392,type:"sawtooth",dur:.6,vol:.16,cut:400,cut2:2600,q:12,glide:.45});blip({f:294,f2:588,type:"square",dur:.6,vol:.08,cut:500,cut2:2000,q:8,glide:.45})},
-  prep(){blip({f:330,f2:660,type:"square",dur:.28,vol:.14,cut:800,cut2:3200,q:10})},
+  tick(){tickAlt=!tickAlt;play(tickAlt?"tickA":"tickB")},
+  count(n){play(n===1?"count1":"count")},
+  work(){play("work")},
+  rest(){play("rest")},
+  macro(){play("macro")},
+  prep(){play("prep")},
   boot(){tabTone(START_TONE,1)},
   reset(){tabTone(RESET_TONE,1)},
   down(){tabTone(RESET_TONE,1)},
-  done(){[392,523,659,1046].forEach((f,i)=>blip({f,type:"square",dur:.5,vol:.12,cut:900,cut2:3600,q:8,at:i*.09}))},
+  done(){play("done")},
   ui(){tabTone(TICK_TONE,.55)},
   toggle(on){tabTone(on?TOGGLE_ON:TOGGLE_OFF,.7)}
 };
@@ -465,7 +499,7 @@ function setLit(n){dialLit=n;dialEdge=n;drawDial()}
 function setEdge(f){dialLit=Math.ceil(f);dialEdge=f;drawDial()}
 
 /* ---------- Timer ---------- */
-function resetState(){runKey="";Q=build(S);st={idx:0,elapsed:0,running:false,started:false,done:false,last:0,lastRem:null,tickT:0}}
+function resetState(){runKey="";uiIdx=-1;uiStage=0;Q=build(S);st={idx:0,elapsed:0,running:false,started:false,done:false,last:0,lastRem:null,tickT:0}}
 function loop(now){
   if(st.running){
     const dt=now-st.last;st.elapsed+=dt;st.last=now;st.tickT+=dt;
@@ -485,25 +519,45 @@ function loop(now){
 }
 function finish(){st.running=false;st.done=true;st.idx=Q.length;releaseWake();SFX.done();if(st.spoken!==Q.length)speak("done","Workout complete");renderRun();renderControls()}
 let curPhase="?";
-function setPhase(type){if(type===curPhase)return;curPhase=type;   // touching the root style every frame forced a full restyle
-  rootStyle.setProperty("--phase",type?"var("+META[type].c+")":"var(--fg)");
-  dialCols.on=getComputedStyle(document.documentElement).getPropertyValue(type?META[type].c:"--fg").trim();dialKey="";}
-let runKey="",nextVis=null,dialT=0;function setNextVis(v){if(v!==nextVis){nextVis=v;$("nextBox").style.visibility=v?"visible":"hidden"}}
+/* Phase colours, read once. Changing phase now touches only the pill layers, the big time and the ring. */
+const PHEX={};let pillLayers=null;
+function readPhaseColors(){const cs=getComputedStyle(document.documentElement);
+  Object.keys(META).forEach(k=>PHEX[k]=cs.getPropertyValue(META[k].c).trim());PHEX.done=cs.getPropertyValue("--fg").trim()}
+function makePillTextures(){try{
+  const pill=$("phaseName"),dpr=Math.min(3,window.devicePixelRatio||1),H=36,M=24,W=H*3,cw=(W+2*M)*dpr,ch=(H+2*M)*dpr;
+  pillLayers={};pill.style.setProperty("--sl",String(Math.round((M+H/2)*dpr)));
+  Object.keys(PHEX).forEach(k=>{const c=document.createElement("canvas");c.width=cw;c.height=ch;const x=c.getContext("2d"),hex=PHEX[k];
+    const rgb=[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16));
+    x.shadowColor="rgba("+rgb.join(",")+",.2)";x.shadowBlur=16*dpr;x.fillStyle=hex;   // = CSS box-shadow 0 0 16px @20%
+    x.beginPath();x.roundRect?x.roundRect(M*dpr,M*dpr,W*dpr,H*dpr,H/2*dpr):(()=>{const r=H/2*dpr,X=M*dpr,Y=M*dpr,w=W*dpr,h=H*dpr;
+      x.moveTo(X+r,Y);x.arcTo(X+w,Y,X+w,Y+h,r);x.arcTo(X+w,Y+h,X,Y+h,r);x.arcTo(X,Y+h,X,Y,r);x.arcTo(X,Y,X+w,Y,r);x.closePath()})();x.fill();
+    const g=document.createElement("i");g.className="pg";g.style.borderImageSource="url("+c.toDataURL()+")";pill.appendChild(g);pillLayers[k]=g});
+  pill.classList.add("tex")}catch(e){pillLayers=null}}
+function setPhase(type){if(type===curPhase)return;const prev=curPhase;curPhase=type;const k=type||"done";
+  if(pillLayers){if(pillLayers[prev||"done"])pillLayers[prev||"done"].classList.remove("on");pillLayers[k].classList.add("on")}
+  const v=type?"var("+META[type].c+")":"var(--fg)";$("phaseName").style.setProperty("--phase",v);$("bigTime").style.setProperty("--phase",v);
+  dialCols.on=PHEX[k];dialKey="";}
+let runKey="",nextVis=null,dialT=0,uiIdx=-1,uiStage=0;function setNextVis(v){if(v!==nextVis){nextVis=v;$("nextBox").style.visibility=v?"visible":"hidden"}}
 let nextC="";function setNextC(v){if(v!==nextC){nextC=v;$("nextBox").style.setProperty("--c",v)}}
 function renderRun(){
   const cur=Q[st.idx], nxt=Q[st.idx+1];
   if(st.done||!cur){
-    setPhase(null);setText($("phaseName"),"Complete");setHTML($("bigTime"),digits("00:00"));$("bigTime").classList.remove("warn");setLit(0);setEdge(0);
+    setPhase(null);setText($("phaseTxt"),"Complete");setHTML($("bigTime"),digits("00:00"));$("bigTime").classList.remove("warn");setLit(0);setEdge(0);
     setHTML($("roundV"),digits("00"));setHTML($("cycleV"),digits("00"));
     setText($("remaining"),"Total "+fmt(totalOf(Q)));setNextVis(false);runKey="";return;
   }
   const remMs=cur.dur*1000-st.elapsed, rem=Math.ceil(remMs/1000);
   const key=st.idx+"|"+rem+"|"+st.started, changed=key!==runKey;
-  if(changed)setPhase(cur.type);
+  /* 4. A phase change is spread over 3 frames: (1) sound + ring in the new colour, (2) pill + big time, (3) the rest. */
+  if(st.idx!==uiIdx){if(st.running&&uiIdx>=0)uiStage=1;uiIdx=st.idx;dialCols.on=PHEX[cur.type];dialKey=""}
   const t=performance.now();
   if(!busy&&(changed||t-dialT>=32)){dialT=t;const f=N*Math.max(0,remMs)/(cur.dur*1000);setEdge(f)}   // ring: at most 30 times a second, only changed bars
+  if(uiStage===1){uiStage=2;return}
+  if(uiStage===2){uiStage=0;setPhase(cur.type);setText($("phaseTxt"),META[cur.type].name);
+    setHTML($("bigTime"),digits(fmt(rem)));$("bigTime").classList.toggle("warn",st.started&&rem<=3);return}
   if(!changed)return;runKey=key;   // everything below runs once per second
-  setText($("phaseName"),META[cur.type].name);
+  setPhase(cur.type);
+  setText($("phaseTxt"),META[cur.type].name);
   setHTML($("bigTime"),digits(fmt(rem)));$("bigTime").classList.toggle("warn",st.started&&rem<=3);
   const cr=cur.type==="cycleRest";
   setHTML($("cycleV"),digits(pad(S.cycles-cur.cycle+(cr?0:1))));
@@ -661,7 +715,7 @@ $("soundBtn").addEventListener("click",()=>{
   },"Version 1.0 · Made by Profets",null);
 });
 
-resetState();paintHome();sizeCta();renderControls();requestAnimationFrame(loop);
+readPhaseColors();makePillTextures();resetState();paintHome();sizeCta();renderControls();requestAnimationFrame(loop);
 </script>
 <script>
 if("serviceWorker" in navigator){addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}))}

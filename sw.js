@@ -1,5 +1,5 @@
 // Offline support: the page is fetched network-first (so updates arrive), everything else cache-first.
-const CACHE = "interval-v13";
+const CACHE = "interval-v14";
 const FILES = ["./", "index.html", "manifest.webmanifest", "keepawake.mp4", "apple-touch-icon.png", "icon-192.png", "icon-512.png",
   "fonts/Urbanist-Bold.woff2", "fonts/Urbanist-ExtraBold.woff2", "fonts/JetBrainsMono-Medium.woff2"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES.map(f => new Request(f, { cache: "reload" }))))); self.skipWaiting(); });
