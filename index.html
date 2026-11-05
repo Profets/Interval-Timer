@@ -664,18 +664,6 @@ $("soundBtn").addEventListener("click",()=>{
 resetState();paintHome();sizeCta();renderControls();requestAnimationFrame(loop);
 </script>
 <script>
-/* TEMP diagnostics: real screen / viewport sizes on the phone (remove after the layout fix) */
-(function(){var d=document.createElement("div"),pr=document.createElement("div");
-  pr.style.cssText="position:fixed;top:0;left:0;width:0;height:0;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);visibility:hidden";document.body.appendChild(pr);
-  d.style.cssText="position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:999;background:#ea5a3c;color:#fff;font:600 13px/1.5 monospace;padding:10px 14px;border-radius:8px;pointer-events:none;white-space:pre";
-  document.body.appendChild(d);
-  function u(){var cs=getComputedStyle(pr),dv=document.getElementById("device").getBoundingClientRect();
-    d.textContent="win "+innerWidth+"x"+innerHeight+"  screen "+screen.width+"x"+screen.height+"
-html "+document.documentElement.clientHeight+"  vv "+Math.round(visualViewport?visualViewport.height:0)+"  app "+Math.round(dv.height)+
-    "
-safe top "+cs.paddingTop+"  bottom "+cs.paddingBottom+"
-standalone "+(navigator.standalone?"yes":"no")+"  v12"}
-  u();addEventListener("resize",u);setTimeout(u,500)})();
 if("serviceWorker" in navigator){addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}))}
 </script>
 </body>
