@@ -196,7 +196,7 @@ header{display:flex;align-items:center;justify-content:space-between;min-height:
 @media (max-height:700px){.wheelwrap{--ih:56px}.wi{font-size:44px}.hud .digits{font-size:44px}}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
 /* iPhone home-screen app: fill the WHOLE screen, edge to edge (pinned to all 4 screen edges: never taller or shorter than the screen) */
-@media (max-width:519px),(max-height:699px){body{display:block}.device{position:fixed;top:0;right:0;bottom:0;left:0;width:auto;height:auto}}
+@media (max-width:519px),(max-height:699px){body{display:block}.device{position:fixed;top:0;left:0;width:100%;height:var(--appH,100%)}}
 </style>
 </head>
 <body>
@@ -664,6 +664,10 @@ $("soundBtn").addEventListener("click",()=>{
 resetState();paintHome();sizeCta();renderControls();requestAnimationFrame(loop);
 </script>
 <script>
+/* iOS home-screen apps with a translucent status bar report a viewport that is the screen MINUS the status bar,
+   so the bottom of the app was cut off. Use the real screen height there. */
+(function(){function fit(){var h=innerHeight;if(navigator.standalone&&matchMedia("(orientation:portrait)").matches)h=Math.max(h,screen.height);
+  document.documentElement.style.setProperty("--appH",h+"px")}fit();addEventListener("resize",fit);addEventListener("orientationchange",function(){setTimeout(fit,300)})})();
 if("serviceWorker" in navigator){addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}))}
 </script>
 </body>
