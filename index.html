@@ -231,12 +231,10 @@ header{display:flex;align-items:center;justify-content:space-between;min-height:
         <div><span class="mono">Cycles left</span><span id="cycleV"></span></div>
       </div>
       <div class="dialwrap"><canvas class="dial" id="dial" aria-hidden="true"></canvas>
-        <i class="cn tl"></i><i class="cn tr"></i><i class="cn bl"></i><i class="cn br"></i>
-        <span class="readout tl">SEQ <b id="seq">01/19</b></span><span class="readout tr" id="phCode">PH-00</span>
-        <span class="readout bl"><span id="remLabel">REMAINING</span> <b id="remaining">00:00</b></span><span class="readout br">SIG <b>OK</b></span>
         <div class="dialin">
           <span class="phase" id="phaseName"><span id="phaseTxt">Prepare</span></span>
           <span class="big" id="bigTime"></span>
+          <span class="mono" id="remaining"></span>
         </div>
       </div>
       <div class="next acard" id="nextBox"><span class="lab"><span class="name" id="nextName"></span></span><span class="val" id="nextTime"></span></div>
@@ -542,7 +540,7 @@ function renderRun(){
   if(st.done||!cur){
     setPhase(null);setText($("phaseTxt"),"Complete");setHTML($("bigTime"),digits("00:00"));$("bigTime").classList.remove("warn");setLit(0);setEdge(0);
     setHTML($("roundV"),digits("00"));setHTML($("cycleV"),digits("00"));
-    setText($("remLabel"),"TOTAL");setText($("remaining"),fmt(totalOf(Q)));setNextVis(false);runKey="";return;
+    setText($("remaining"),"Total "+fmt(totalOf(Q)));setNextVis(false);runKey="";return;
   }
   const remMs=cur.dur*1000-st.elapsed, rem=Math.ceil(remMs/1000);
   const key=st.idx+"|"+rem+"|"+st.started, changed=key!==runKey;
@@ -561,8 +559,7 @@ function renderRun(){
   setHTML($("cycleV"),digits(pad(S.cycles-cur.cycle+(cr?0:1))));
   setHTML($("roundV"),digits(pad(cr?0:S.rounds-cur.round+1)));
   let left=remMs/1000;for(let i=st.idx+1;i<Q.length;i++)left+=Q[i].dur;
-  setText($("remLabel"),"REMAINING");setText($("remaining"),fmt(Math.ceil(left)));
-  setText($("seq"),pad(st.idx+1)+"/"+pad(Q.length));setText($("phCode"),META[cur.type].code);
+  setText($("remaining"),"Remaining "+fmt(Math.ceil(left)));
   setNextVis(true);
   if(nxt){setNextC("var("+META[nxt.type].c+")");setText($("nextName"),META[nxt.type].name);setHTML($("nextTime"),digits(fmt(nxt.dur)))}
   else{setNextC("var(--fg)");setText($("nextName"),"Finish");setHTML($("nextTime"),"")}
