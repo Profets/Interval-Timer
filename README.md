@@ -1,6 +1,6 @@
 # Interval
 
-Timer a intervalli per l'allenamento, installabile su iPhone come web app: gratis, funziona offline, non scade.
+Timer a intervalli per l'allenamento, installabile su iPhone e iPad come web app: gratis, funziona offline, non scade. Si adatta a ogni schermo: telefono, iPad e computer, in verticale e in orizzontale.
 
 **App:** https://profets.github.io/Interval-Timer/
 

@@ -26,6 +26,7 @@ html{background:#0b121a}
 /* Layout: retro-futurist field instrument. Home = big-number setup rows (tap → full-screen wheel editor).
    Start boots a 60-tick dial; Reset/Done powers it down back to the setup. Single deliberate dark look. */
 :root{
+  --k:1;   /* layout scale: 1 on phones, bigger on iPad / desktop (set by fitScreen() in JS) */
   color-scheme:dark;
   /* synced from Figma (Retro collection) */
   --bg:#0b121a; --panel:#1a202a; --panel2:#2d303b; --raise:#1c1e26; --fg:#efe6d2; --muted:#8c8984; --dim:#363533; --line:rgba(239,230,210,.09);
@@ -40,8 +41,8 @@ body{background:#0b121a;touch-action:manipulation;display:flex;align-items:cente
   padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px);-webkit-tap-highlight-color:transparent;overflow:hidden}
 *{box-sizing:border-box}
 button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;padding:0}
-button:focus-visible,.wheel:focus-visible{outline:2px solid var(--yellow);outline-offset:3px}
-.gutter{padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:max(18px,env(safe-area-inset-right,0px))}
+button:focus-visible,.wheel:focus-visible{outline:calc(2px*var(--k)) solid var(--yellow);outline-offset:calc(3px*var(--k))}
+.gutter{padding-left:max(calc(18px*var(--k)),env(safe-area-inset-left,0px));padding-right:max(calc(18px*var(--k)),env(safe-area-inset-right,0px))}
 
 .device{position:relative;width:100%;height:100%;overflow:hidden;container-type:inline-size;
   background:var(--bg)}
@@ -49,31 +50,29 @@ button:focus-visible,.wheel:focus-visible{outline:2px solid var(--yellow);outlin
    In the desktop frame (and in .sim) we simulate an iPhone X: 44 pt status bar / notch area on top, 34 pt home-indicator area at the bottom. */
 .device{--sat:env(safe-area-inset-top,0px);--sab:env(safe-area-inset-bottom,0px)} /* installed web app: real iPhone safe areas */
 .ios-status,.ios-home{display:none}
-@media (min-width:520px) and (min-height:700px){body{background:#050608}.device{max-width:375px;max-height:812px;height:calc(100% - 48px);border-radius:20px;box-shadow:0 30px 80px rgba(0,0,0,.5)}}
-@media (min-width:520px) and (min-height:700px){.device{--sat:44px;--sab:34px}.ios-status,.ios-home{display:flex}}
 .device.sim{--sat:44px;--sab:34px}.device.sim .ios-status,.device.sim .ios-home{display:flex}
 .ios-status{position:absolute;left:0;right:0;top:0;height:44px;z-index:55;align-items:center;justify-content:space-between;padding:0 26px 0 32px;pointer-events:none;
-  font:600 15px/1 -apple-system,"SF Pro Text",system-ui,sans-serif;color:var(--fg)}
+  font:600 calc(15px*var(--k))/1 -apple-system,"SF Pro Text",system-ui,sans-serif;color:var(--fg)}
 .ios-status .notch{position:absolute;left:50%;top:0;width:150px;height:30px;margin-left:-75px;background:#000;border-radius:0 0 18px 18px}
 .ios-status svg{height:12px;width:auto}
 .ios-home{position:absolute;left:0;right:0;bottom:0;height:34px;z-index:55;align-items:center;justify-content:center;pointer-events:none}
 .ios-home i{width:134px;height:5px;border-radius:3px;background:var(--fg);opacity:.9;margin-top:8px}
-.app{height:100%;display:flex;flex-direction:column;padding-top:calc(14px + var(--sat));padding-bottom:max(16px,calc(var(--sab) - 6px));gap:14px}  /* ~28 pt above the screen edge on Face ID iPhones, like Figma */
+.app{height:100%;display:flex;flex-direction:column;padding-top:calc(calc(14px*var(--k)) + var(--sat));padding-bottom:max(calc(16px*var(--k)),calc(var(--sab) - calc(6px*var(--k))));gap:calc(14px*var(--k))}  /* ~28 pt above the screen edge on Face ID iPhones, like Figma */
 
 /* Header with the four-band mark */
-header{display:flex;align-items:center;justify-content:space-between;min-height:44px}
-.mark{display:flex;align-items:center;gap:12px}
+header{display:flex;align-items:center;justify-content:space-between;min-height:calc(44px*var(--k))}
+.mark{display:flex;align-items:center;gap:calc(12px*var(--k))}
 /* Logo mark (from Figma): four 30×4 bands, 3 apart, alternating 0 / +4 offset */
-.bands{display:grid;grid-template-rows:repeat(4,4px);gap:3px;width:34px}
-.bands i{display:block;width:30px;height:4px;border-radius:2px;--g:var(--yellow);box-shadow:0 0 4px color-mix(in srgb,var(--g) 20%,transparent)}
+.bands{display:grid;grid-template-rows:repeat(4,calc(4px*var(--k)));gap:calc(3px*var(--k));width:calc(34px*var(--k))}
+.bands i{display:block;width:calc(30px*var(--k));height:calc(4px*var(--k));border-radius:calc(2px*var(--k));--g:var(--yellow);box-shadow:0 0 calc(4px*var(--k)) color-mix(in srgb,var(--g) 20%,transparent)}
 .bands i:nth-child(2){--g:var(--red)}.bands i:nth-child(3){--g:var(--green)}.bands i:nth-child(4){--g:var(--blue)}
-.bands i:nth-child(2),.bands i:nth-child(4){margin-left:4px}
+.bands i:nth-child(2),.bands i:nth-child(4){margin-left:calc(4px*var(--k))}
 .bands i:nth-child(1){background:var(--yellow)}.bands i:nth-child(2){background:var(--red)}.bands i:nth-child(3){background:var(--green)}.bands i:nth-child(4){background:var(--blue)}
-.brand{font-family:var(--f-display);font-weight:800;font-size:20px;letter-spacing:.02em;line-height:1}
-.brand small{display:block;font-family:var(--f-mono);font-weight:500;font-size:9.5px;letter-spacing:.18em;color:var(--muted);margin-top:4px}
-.icon-btn{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:var(--panel);border:1px solid var(--line)}
-.icon-btn svg{width:24px;height:24px}
-.mono{font-family:var(--f-mono);font-size:10px;font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.brand{font-family:var(--f-display);font-weight:800;font-size:calc(20px*var(--k));letter-spacing:.02em;line-height:1}
+.brand small{display:block;font-family:var(--f-mono);font-weight:500;font-size:calc(9.5px*var(--k));letter-spacing:.18em;color:var(--muted);margin-top:calc(4px*var(--k))}
+.icon-btn{width:calc(44px*var(--k));height:calc(44px*var(--k));border-radius:50%;display:grid;place-items:center;background:var(--panel);border:1px solid var(--line)}
+.icon-btn svg{width:calc(24px*var(--k));height:calc(24px*var(--k))}
+.mono{font-family:var(--f-mono);font-size:calc(10px*var(--k));font-weight:500;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
 
 /* Fixed-width digits so numbers never jitter, with a plain zero */
 .digits{display:inline-flex;font-family:var(--f-display);font-weight:700;font-feature-settings:"tnum";letter-spacing:0}
@@ -82,77 +81,87 @@ header{display:flex;align-items:center;justify-content:space-between;min-height:
 
 .views{position:relative;flex:1;min-height:0}
 .view{position:absolute;inset:0;display:flex;flex-direction:column}
+/* Responsive: content column centred, max width --maxw (set in JS); everything scales with --k */
+.app,.overlay{--side:max(calc(18px*var(--k)),calc((100% - var(--maxw,9999px))/2 + calc(18px*var(--k))));padding-left:max(var(--side),env(safe-area-inset-left,0px));padding-right:max(var(--side),env(safe-area-inset-right,0px))}
+/* Landscape (iPad / desktop / phone sideways): setup cards in 2 columns, run screen = dial left + info right */
+.device.land .rows{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:repeat(3,minmax(0,1fr));grid-auto-flow:column}
+.device.land .controls{width:100%;max-width:calc(460px*var(--k));margin-inline:auto;align-self:center}
+.device.land #run{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto auto minmax(0,1fr);column-gap:calc(32px*var(--k))!important}
+.device.land .hud{grid-column:2;grid-row:2}
+.device.land .dialwrap{grid-column:1;grid-row:1/5}
+.device.land .next{grid-column:2;grid-row:3}
+.device.land .overlay{--maxw:calc(560px*var(--k))}
 
 /* Home: big-number setup */
-.sec{height:1px;flex:none;background:var(--line);margin-bottom:12px}   /* plain hairline under the header */
-.rows{flex:1;display:flex;flex-direction:column;gap:8px;min-height:0}
+.sec{height:1px;flex:none;background:var(--line);margin-bottom:calc(12px*var(--k))}   /* plain hairline under the header */
+.rows{flex:1;display:flex;flex-direction:column;gap:calc(8px*var(--k));min-height:0}
 /* Card: dark panel, soft neutral stroke, full-height phase line on the left edge */
-.acard{position:relative;overflow:hidden;border-radius:10px;border:1px solid var(--line);
+.acard{position:relative;overflow:hidden;border-radius:calc(10px*var(--k));border:1px solid var(--line);
   background:linear-gradient(160deg,color-mix(in srgb,var(--panel) 40%,transparent) 0%,color-mix(in srgb,var(--panel2) 40%,transparent) 100%)}
-.acard::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--c);pointer-events:none;
-  box-shadow:16px 0 80px var(--c)} /* soft wash of the phase colour into the card, clipped by the card */
+.acard::before{content:"";position:absolute;left:0;top:0;bottom:0;width:calc(4px*var(--k));background:var(--c);pointer-events:none;
+  box-shadow:calc(16px*var(--k)) 0 calc(80px*var(--k)) var(--c)} /* soft wash of the phase colour into the card, clipped by the card */
 .acard > *{position:relative}
-.row{flex:1;min-height:52px;display:flex;align-items:center;gap:14px;text-align:left;padding:0 16px 0 18px;transition:border-color .2s,transform .15s,filter .2s}
+.row{flex:1;min-height:calc(52px*var(--k));display:flex;align-items:center;gap:calc(14px*var(--k));text-align:left;padding:0 calc(16px*var(--k)) 0 calc(18px*var(--k));transition:border-color .2s,transform .15s,filter .2s}
 .row:hover{filter:brightness(1.08)}
 .row:active{transform:scale(.985)}
 .row .tag{display:none}
-.row .id{position:absolute;right:12px;top:7px;font-family:var(--f-mono);font-size:8.5px;letter-spacing:.16em;color:var(--muted);opacity:.7}
-.row .lab,.next .lab{display:flex;flex-direction:column;gap:3px;min-width:0}
-.row .name,.next .name{font-family:var(--f-display);font-weight:700;font-size:20px;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
-.row .val{margin-left:auto;font-size:clamp(32px,11cqw,40px);line-height:1}
+.row .id{position:absolute;right:calc(12px*var(--k));top:calc(7px*var(--k));font-family:var(--f-mono);font-size:calc(8.5px*var(--k));letter-spacing:.16em;color:var(--muted);opacity:.7}
+.row .lab,.next .lab{display:flex;flex-direction:column;gap:calc(3px*var(--k));min-width:0}
+.row .name,.next .name{font-family:var(--f-display);font-weight:700;font-size:calc(20px*var(--k));letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+.row .val{margin-left:auto;font-size:clamp(calc(32px*var(--k)),11cqw,calc(40px*var(--k)));line-height:1}
 .row.count .val{color:var(--fg)}
 .row.dim{opacity:.35}
-.row .edit{width:7px;height:12px;color:var(--muted);flex:none;margin-left:4px}
-.foot{display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding:12px 4px 0;border-top:1px solid var(--line)}
-.foot .total{font-size:20px;color:var(--fg)}
+.row .edit{width:calc(7px*var(--k));height:calc(12px*var(--k));color:var(--muted);flex:none;margin-left:calc(4px*var(--k))}
+.foot{display:flex;justify-content:space-between;align-items:center;margin-top:calc(12px*var(--k));padding:calc(12px*var(--k)) calc(4px*var(--k)) 0;border-top:1px solid var(--line)}
+.foot .total{font-size:calc(20px*var(--k));color:var(--fg)}
 
 /* Run: HUD + dial */
-.hud{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.hud > div{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:14px 12px 12px;text-align:center;border-radius:10px;border:1px solid var(--line);
+.hud{display:grid;grid-template-columns:1fr 1fr;gap:calc(8px*var(--k))}
+.hud > div{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:calc(4px*var(--k));padding:calc(14px*var(--k)) calc(12px*var(--k)) calc(12px*var(--k));text-align:center;border-radius:calc(10px*var(--k));border:1px solid var(--line);
   background:linear-gradient(160deg,color-mix(in srgb,var(--panel) 40%,transparent) 0%,color-mix(in srgb,var(--panel2) 40%,transparent) 100%)}
-.hud .digits{font-size:58px;line-height:1}
+.hud .digits{font-size:calc(58px*var(--k));line-height:1}
 .dialwrap{flex:1;min-height:0;position:relative;display:grid;place-items:center}
-.dialwrap .cn{position:absolute;width:18px;height:18px;border-color:var(--dim);border-style:solid;border-width:0}
-.cn.tl{left:0;top:0;border-left-width:1px;border-top-width:1px;border-top-left-radius:6px}
-.cn.tr{right:0;top:0;border-right-width:1px;border-top-width:1px;border-top-right-radius:6px}
-.cn.bl{left:0;bottom:0;border-left-width:1px;border-bottom-width:1px;border-bottom-left-radius:6px}
-.cn.br{right:0;bottom:0;border-right-width:1px;border-bottom-width:1px;border-bottom-right-radius:6px}
-.readout{position:absolute;font-family:var(--f-mono);font-size:9.5px;letter-spacing:.16em;color:var(--dim)}
+.dialwrap .cn{position:absolute;width:calc(18px*var(--k));height:calc(18px*var(--k));border-color:var(--dim);border-style:solid;border-width:0}
+.cn.tl{left:0;top:0;border-left-width:1px;border-top-width:1px;border-top-left-radius:calc(6px*var(--k))}
+.cn.tr{right:0;top:0;border-right-width:1px;border-top-width:1px;border-top-right-radius:calc(6px*var(--k))}
+.cn.bl{left:0;bottom:0;border-left-width:1px;border-bottom-width:1px;border-bottom-left-radius:calc(6px*var(--k))}
+.cn.br{right:0;bottom:0;border-right-width:1px;border-bottom-width:1px;border-bottom-right-radius:calc(6px*var(--k))}
+.readout{position:absolute;font-family:var(--f-mono);font-size:calc(9.5px*var(--k));letter-spacing:.16em;color:var(--dim)}
 /* readouts sit inside their corner bracket: clear of both arms, aligned to the bracket's inner edge */
-.readout{line-height:12px;white-space:nowrap}
-.readout.tl{left:10px;top:8px}.readout.tr{right:10px;top:8px;text-align:right}.readout.bl{left:10px;bottom:8px}.readout.br{right:10px;bottom:8px;text-align:right}
+.readout{line-height:calc(12px*var(--k));white-space:nowrap}
+.readout.tl{left:calc(10px*var(--k));top:calc(8px*var(--k))}.readout.tr{right:calc(10px*var(--k));top:calc(8px*var(--k));text-align:right}.readout.bl{left:calc(10px*var(--k));bottom:calc(8px*var(--k))}.readout.br{right:calc(10px*var(--k));bottom:calc(8px*var(--k));text-align:right}
 .readout b{color:var(--muted);font-weight:500}
 .dial{position:absolute;inset:0;width:100%;height:100%}
 /* Uniform square-cut segments; the gaps are a background-coloured stroke so they keep a constant width */
 /* Thin ring: continuous dark track; only the lit part is split into segments, with phosphor bloom */
 /* 120 thin bars all round; the gaps are a background-coloured stroke so they stay a constant width */
 /* Glow: a blurred copy of only the lit bars (fill only, no stroke) laid OVER the ring, so it also softly tints the dark gaps */
-.dialin{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center}
+.dialin{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:calc(8px*var(--k));text-align:center}
 /* Phase pill: its colour + glow are pre-made textures (one per phase, made once at start-up), stacked behind the
    text and cross-faded with opacity only, so changing phase costs no repaint. Fallback colour if textures are missing. */
-.phase{position:relative;z-index:0;display:flex;align-items:center;height:36px;box-sizing:border-box;padding:0 16px;border-radius:999px;background:var(--phase);color:var(--bg);
-  font-family:var(--f-display);font-weight:800;font-size:20px;line-height:24px;letter-spacing:.1em;text-transform:uppercase}
-.phase .pg{position:absolute;inset:0;z-index:-1;border-radius:999px;pointer-events:none;opacity:0;transition:opacity .3s;will-change:opacity}
-.phase .pg b{position:absolute;inset:-24px;z-index:-1;background-size:100% 100%;background-repeat:no-repeat}
+.phase{position:relative;z-index:0;display:flex;align-items:center;height:calc(36px*var(--k));box-sizing:border-box;padding:0 calc(16px*var(--k));border-radius:calc(999px*var(--k));background:var(--phase);color:var(--bg);
+  font-family:var(--f-display);font-weight:800;font-size:calc(20px*var(--k));line-height:calc(24px*var(--k));letter-spacing:.1em;text-transform:uppercase}
+.phase .pg{position:absolute;inset:0;z-index:-1;border-radius:calc(999px*var(--k));pointer-events:none;opacity:0;transition:opacity .3s;will-change:opacity}
+.phase .pg b{position:absolute;inset:calc(-24px*var(--k));z-index:-1;background-size:100% 100%;background-repeat:no-repeat}
 .phase .pg.on{opacity:1}
 .phase::before{content:none}
-.big{font-size:clamp(60px,24cqw,92px);line-height:1;color:var(--fg)}
+.big{font-size:clamp(calc(60px*var(--k)),24cqw,calc(92px*var(--k)));line-height:1;color:var(--fg)}
 .big.warn{color:var(--phase,var(--fg))}
 /* Next: the same card as the setup rows, just shorter */
-.next{display:flex;align-items:center;gap:14px;padding:12px 18px;min-height:60px;color:var(--muted)}
-.next .val{margin-left:auto;font-size:30px;line-height:1}
+.next{display:flex;align-items:center;gap:calc(14px*var(--k));padding:calc(12px*var(--k)) calc(18px*var(--k));min-height:calc(60px*var(--k));color:var(--muted)}
+.next .val{margin-left:auto;font-size:calc(30px*var(--k));line-height:1}
 
 /* Controls */
-.controls{position:relative;height:68px;flex:none;display:flex;align-items:center;justify-content:center}
+.controls{position:relative;height:calc(68px*var(--k));flex:none;display:flex;align-items:center;justify-content:center}
 /* CTA: built from 3 pieces (left cap, right cap, middle) that only move/scale, so the pill <-> circle morph
    runs on the GPU with no layout work. The 4 pt bg gap + 1 pt ring are drawn by each piece. */
-.cta{position:absolute;left:0;top:0;height:68px;width:100%;background:none;color:var(--bg);pointer-events:none;--dx:0px;--ring:#20252b;
-  font-family:var(--f-display);font-weight:800;font-size:22px;line-height:1;letter-spacing:.14em;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:12px;
+.cta{position:absolute;left:0;top:0;height:calc(68px*var(--k));width:100%;background:none;color:var(--bg);pointer-events:none;--dx:0px;--ring:#20252b;
+  font-family:var(--f-display);font-weight:800;font-size:calc(22px*var(--k));line-height:1;letter-spacing:.14em;text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:calc(12px*var(--k));
   touch-action:manipulation}
 .cta>i{position:absolute;top:0;pointer-events:auto;will-change:transform;transition:transform .45s cubic-bezier(.3,.7,.2,1)}
-.cta .cl,.cta .cr{width:68px;height:68px;border-radius:50%;background:var(--fg);box-shadow:0 0 0 4px var(--bg),0 0 0 5px var(--ring)}
+.cta .cl,.cta .cr{width:calc(68px*var(--k));height:calc(68px*var(--k));border-radius:50%;background:var(--fg);box-shadow:0 0 0 calc(4px*var(--k)) var(--bg),0 0 0 calc(5px*var(--k)) var(--ring)}
 .cta .cl{left:0}.cta .cr{right:0}
-.cta .cm{left:34px;right:34px;top:-5px;height:78px;background:linear-gradient(var(--ring) 0 1px,var(--bg) 1px 5px,var(--fg) 5px 73px,var(--bg) 73px 77px,var(--ring) 77px)}
+.cta .cm{left:calc(34px*var(--k));right:calc(34px*var(--k));top:calc(-5px*var(--k));height:calc(78px*var(--k));background:linear-gradient(var(--ring) 0 1px,var(--bg) 1px calc(5px*var(--k)),var(--fg) calc(5px*var(--k)) calc(73px*var(--k)),var(--bg) calc(73px*var(--k)) calc(77px*var(--k)),var(--ring) calc(77px*var(--k)))}
 .cta.compact .cl{transform:translateX(var(--dx)) scale(.941)}
 .cta.compact .cr{transform:translateX(calc(-1 * var(--dx))) scale(.941)}
 .cta.compact .cm{transform:scale(0,.941)}
@@ -160,50 +169,50 @@ header{display:flex;align-items:center;justify-content:space-between;min-height:
 .cta.compact .cta-label{display:none}
 .cta svg,.cta span{pointer-events:none}
 #ctaIcon{display:flex;align-items:center}
-.cta svg{width:24px;height:24px;flex:none;display:block}
+.cta svg{width:calc(24px*var(--k));height:calc(24px*var(--k));flex:none;display:block}
 .cta-label{display:block;padding-left:.14em;transform:translateY(1px)}
-.reset{position:absolute;left:0;width:48px;height:48px;padding:0;justify-content:center;border-radius:50%;background:var(--panel);border:1px solid var(--line);
-  font-family:var(--f-mono);font-weight:500;font-size:16px;letter-spacing:.12em;text-transform:uppercase;display:flex;align-items:center;gap:6px}
-.reset svg{width:24px;height:24px}
+.reset{position:absolute;left:0;width:calc(48px*var(--k));height:calc(48px*var(--k));padding:0;justify-content:center;border-radius:50%;background:var(--panel);border:1px solid var(--line);
+  font-family:var(--f-mono);font-weight:500;font-size:calc(16px*var(--k));letter-spacing:.12em;text-transform:uppercase;display:flex;align-items:center;gap:calc(6px*var(--k))}
+.reset svg{width:calc(24px*var(--k));height:calc(24px*var(--k))}
 
 /* Full-screen overlay (editor / sounds) */
-.overlay{position:absolute;inset:0;z-index:40;background:var(--bg);display:flex;flex-direction:column;padding-top:calc(14px + var(--sat));padding-bottom:max(20px,calc(var(--sab) - 2px))}
+.overlay{position:absolute;inset:0;z-index:40;background:var(--bg);display:flex;flex-direction:column;padding-top:calc(calc(14px*var(--k)) + var(--sat));padding-bottom:max(calc(20px*var(--k)),calc(var(--sab) - calc(2px*var(--k))))}
 [hidden]{display:none!important}
-.nav{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;min-height:52px;border-bottom:1px solid var(--line)}
-.nav h2{margin:0;font-family:var(--f-display);font-weight:800;font-size:17px;letter-spacing:.1em;text-transform:uppercase;display:flex;align-items:center;gap:10px}
-.nav h2 i{width:10px;height:10px;border-radius:50%;background:var(--c,var(--fg));box-shadow:0 0 16px color-mix(in srgb,var(--c,var(--fg)) 20%,transparent)}
-.nav button{font-family:var(--f-mono);font-size:16px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;padding:12px 0;color:var(--muted)}
+.nav{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;min-height:calc(52px*var(--k));border-bottom:1px solid var(--line)}
+.nav h2{margin:0;font-family:var(--f-display);font-weight:800;font-size:calc(17px*var(--k));letter-spacing:.1em;text-transform:uppercase;display:flex;align-items:center;gap:calc(10px*var(--k))}
+.nav h2 i{width:calc(10px*var(--k));height:calc(10px*var(--k));border-radius:50%;background:var(--c,var(--fg));box-shadow:0 0 calc(16px*var(--k)) color-mix(in srgb,var(--c,var(--fg)) 20%,transparent)}
+.nav button{font-family:var(--f-mono);font-size:calc(16px*var(--k));font-weight:500;letter-spacing:.14em;text-transform:uppercase;padding:calc(12px*var(--k)) 0;color:var(--muted)}
 .nav .go{justify-self:end;color:var(--yellow)}
 .nav .back{justify-self:start}
-.editor{flex:1;display:flex;align-items:center;justify-content:center;gap:14px;min-height:0}
-.col{display:flex;align-items:center;gap:10px}
-.unit{font-family:var(--f-mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
-.wheelwrap{position:relative;--ih:72px;height:calc(var(--ih)*5);width:116px}
-.wheelwrap::before{content:"";position:absolute;left:0;right:0;top:calc(var(--ih)*2 - 4px);height:calc(var(--ih) + 8px);
-  background:var(--panel2);border-radius:999px;border:1px solid var(--c,var(--fg));pointer-events:none;
-  box-shadow:0 0 16px color-mix(in srgb,var(--c,var(--fg)) 20%,transparent)}
+.editor{flex:1;display:flex;align-items:center;justify-content:center;gap:calc(14px*var(--k));min-height:0}
+.col{display:flex;align-items:center;gap:calc(10px*var(--k))}
+.unit{font-family:var(--f-mono);font-size:calc(12px*var(--k));letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.wheelwrap{position:relative;--ih:calc(72px*var(--k));height:calc(var(--ih)*5);width:calc(116px*var(--k))}
+.wheelwrap::before{content:"";position:absolute;left:0;right:0;top:calc(var(--ih)*2 - calc(4px*var(--k)));height:calc(var(--ih) + calc(8px*var(--k)));
+  background:var(--panel2);border-radius:calc(999px*var(--k));border:1px solid var(--c,var(--fg));pointer-events:none;
+  box-shadow:0 0 calc(16px*var(--k)) color-mix(in srgb,var(--c,var(--fg)) 20%,transparent)}
 .wheel{position:relative;height:100%;overflow:hidden;touch-action:none;cursor:grab;-webkit-user-select:none;user-select:none;
   -webkit-mask-image:linear-gradient(transparent,#000 30%,#000 70%,transparent);mask-image:linear-gradient(transparent,#000 30%,#000 70%,transparent)}
 .wheel .track{will-change:transform}
-.wi{height:var(--ih);display:flex;align-items:center;justify-content:center;font-size:58px;line-height:1;user-select:none;cursor:pointer}
+.wi{height:var(--ih);display:flex;align-items:center;justify-content:center;font-size:calc(58px*var(--k));line-height:1;user-select:none;cursor:pointer}
 .hint{text-align:center}
-.trow{display:flex;align-items:center;gap:14px;padding:16px 0;border-bottom:1px solid var(--line)}
-.trow .ttl{flex:1;font-family:var(--f-display);font-weight:700;font-size:16px;letter-spacing:.06em;text-transform:uppercase}
-.trow .mono{display:block;margin-top:4px}
+.trow{display:flex;align-items:center;gap:calc(14px*var(--k));padding:calc(16px*var(--k)) 0;border-bottom:1px solid var(--line)}
+.trow .ttl{flex:1;font-family:var(--f-display);font-weight:700;font-size:calc(16px*var(--k));letter-spacing:.06em;text-transform:uppercase}
+.trow .mono{display:block;margin-top:calc(4px*var(--k))}
 /* Sound options fold away when the master "Sounds" switch is off */
 .fold{display:grid;grid-template-rows:1fr;opacity:1;transition:grid-template-rows .26s cubic-bezier(.3,.7,.2,1),opacity .2s}
 .fold>div{overflow:hidden;min-height:0}
 .fold.shut{grid-template-rows:0fr;opacity:0}
-.toggle{width:52px;height:30px;border-radius:15px;background:var(--raise);border:1px solid var(--line);position:relative;flex:none;transition:background .2s}
-.toggle::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:var(--muted);transition:transform .2s,background .2s}
-.toggle[aria-checked="true"]{background:var(--green);box-shadow:0 0 16px color-mix(in srgb,var(--green) 20%,transparent)}
-.toggle[aria-checked="true"]::after{transform:translateX(22px);background:var(--fg)}
-.test{margin-top:18px;align-self:flex-start;font-family:var(--f-mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;padding:12px 18px;border:1px solid var(--line);border-radius:999px;background:var(--panel)}
+.toggle{width:calc(52px*var(--k));height:calc(30px*var(--k));border-radius:calc(15px*var(--k));background:var(--raise);border:1px solid var(--line);position:relative;flex:none;transition:background .2s}
+.toggle::after{content:"";position:absolute;top:calc(3px*var(--k));left:calc(3px*var(--k));width:calc(22px*var(--k));height:calc(22px*var(--k));border-radius:50%;background:var(--muted);transition:transform .2s,background .2s}
+.toggle[aria-checked="true"]{background:var(--green);box-shadow:0 0 calc(16px*var(--k)) color-mix(in srgb,var(--green) 20%,transparent)}
+.toggle[aria-checked="true"]::after{transform:translateX(calc(22px*var(--k)));background:var(--fg)}
+.test{margin-top:calc(18px*var(--k));align-self:flex-start;font-family:var(--f-mono);font-size:calc(12px*var(--k));letter-spacing:.14em;text-transform:uppercase;padding:calc(12px*var(--k)) calc(18px*var(--k));border:1px solid var(--line);border-radius:calc(999px*var(--k));background:var(--panel)}
 
-@media (max-height:700px){.wheelwrap{--ih:56px}.wi{font-size:44px}.hud .digits{font-size:44px}}
+@media (max-height:700px){.wheelwrap{--ih:calc(56px*var(--k))}.wi{font-size:calc(44px*var(--k))}.hud .digits{font-size:calc(44px*var(--k))}}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
 /* iPhone home-screen app: fill the WHOLE screen, edge to edge (pinned to all 4 screen edges: never taller or shorter than the screen) */
-@media (max-width:519px),(max-height:699px){body{display:block}.device{position:fixed;top:0;right:0;bottom:0;left:0;width:auto;height:auto}}
+body{display:block}.device{position:fixed;top:0;right:0;bottom:0;left:0;width:auto;height:auto}
 </style>
 </head>
 <body>
@@ -506,7 +515,14 @@ function drawDial(){
     dctx.fillStyle=c;dctx.fill(p);dctx.stroke(p)}
 }
 function drawGlow(){sizeDial();dialColors();drawDial()}   /* kept name: (re)measure + redraw */
-addEventListener("resize",()=>{sizeDial();drawDial()});
+/* Fit any screen: phones keep the designed size (k = 1), iPad / desktop scale up, landscape gets its own layout */
+function fitScreen(){const d=$("device"),w=d.clientWidth,h=d.clientHeight;if(!w||!h)return;
+  const land=w>h*1.05&&w>=560;let k=land?Math.min(w/900,h/700):Math.min(w/390,h/844);
+  k=land?Math.max(.6,Math.min(1.5,k)):Math.max(1,Math.min(1.6,k));
+  document.documentElement.style.setProperty("--k",k.toFixed(3));d.classList.toggle("land",land);
+  d.style.setProperty("--maxw",Math.round((land?1000:460)*k)+"px");
+  sizeDial();dialKey="";drawDial();sizeCta()}
+addEventListener("resize",fitScreen);addEventListener("orientationchange",()=>setTimeout(fitScreen,250));
 function setLit(n){dialLit=n;dialEdge=n;drawDial()}
 function setEdge(f){dialLit=Math.ceil(f);dialEdge=f;drawDial()}
 
@@ -585,7 +601,7 @@ const ICON={
   pause:'<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>',
   check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>'
 };
-function sizeCta(){const c=$("cta");c.style.setProperty("--dx",(c.clientWidth/2-34)+"px")}
+function sizeCta(){const c=$("cta");c.style.setProperty("--dx",(c.clientWidth/2-c.clientHeight/2)+"px")}
 addEventListener("resize",sizeCta);
 function renderControls(){
   const cta=$("cta"),live=mode==="run"&&!st.done;
@@ -734,7 +750,7 @@ $("soundBtn").addEventListener("click",()=>{
   },"Version 1.0 · Made by Profets",null);
 });
 
-readPhaseColors();makePillTextures();resetState();paintHome();sizeCta();renderControls();requestAnimationFrame(loop);
+fitScreen();readPhaseColors();makePillTextures();resetState();paintHome();sizeCta();renderControls();requestAnimationFrame(loop);
 </script>
 <script>
 if("serviceWorker" in navigator){addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}))}
