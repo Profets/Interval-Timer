@@ -441,6 +441,8 @@ function loadVoice(){if(!actx||vbus)return;
     const b64=VOICE_CLIPS[k].split(",")[1],bin=atob(b64),u8=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);
     const done=b=>{VBUF[k]=b},pr=actx.decodeAudioData(u8.buffer,done,()=>{});if(pr&&pr.then)pr.then(done).catch(()=>{});
   }catch(e){}})}
+/* Ducking: while the voice speaks, the effects drop so the words stay on top */
+function duck(on){ducked=on;if(master&&actx)master.gain.setTargetAtTime(masterLevel()*(on?.4:1),actx.currentTime,.06)}
 function stopVoice(){try{vSrc&&vSrc.stop()}catch(e){}vSrc=null;clearTimeout(vDuckT);duck(false)}
 function speak(key){if(!S.voice||!S.sfx||!actx)return;const b=VBUF[key];if(!b)return;
   try{if(actx.state!=="running")actx.resume().catch(()=>{});
