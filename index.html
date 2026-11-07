@@ -188,8 +188,27 @@ header{display:flex;align-items:center;justify-content:space-between;min-height:
 .wi{height:var(--ih);display:flex;align-items:center;justify-content:center;font-size:58px;line-height:1;user-select:none;cursor:pointer}
 .hint{text-align:center}
 .trow{display:flex;align-items:center;gap:14px;padding:16px 0;border-bottom:1px solid var(--line)}
-.trow .ttl{flex:1;font-family:var(--f-display);font-weight:700;font-size:16px;letter-spacing:.06em;text-transform:uppercase}
-.trow .mono{display:block;margin-top:4px}
+.trow .ttl,.vrow .ttl{flex:1;font-family:var(--f-display);font-weight:700;font-size:16px;letter-spacing:.06em;text-transform:uppercase}
+.trow .mono,.vrow .mono{display:block;margin-top:4px}
+.trow.off{opacity:.35;pointer-events:none}
+/* Volume: retro segmented slider (same language as the dial ticks); shown only while Sound effects is on */
+.fold{display:grid;grid-template-rows:1fr;opacity:1;transition:grid-template-rows .26s cubic-bezier(.3,.7,.2,1),opacity .2s}
+.fold>div{overflow:hidden;min-height:0}
+.fold.shut{grid-template-rows:0fr;opacity:0}
+.vrow{padding:14px 0 18px;border-bottom:1px solid var(--line)}
+.vrow .vhead{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px}
+.vrow .vhead .ttl{flex:none}
+.vrow .vval{font-family:var(--f-mono);font-size:12px;letter-spacing:.14em;color:var(--fg)}
+.slider{-webkit-appearance:none;appearance:none;display:block;width:100%;height:30px;margin:0;background:none;touch-action:none;--v:100%;cursor:pointer}
+.slider:focus{outline:none}
+.slider::-webkit-slider-runnable-track{height:12px;border-radius:6px;border:1px solid var(--line);
+  background:repeating-linear-gradient(90deg,transparent 0 6px,var(--bg) 6px 8px),linear-gradient(90deg,var(--green) var(--v),var(--raise) var(--v));
+  box-shadow:0 0 16px color-mix(in srgb,var(--green) 20%,transparent)}
+.slider::-moz-range-track{height:12px;border-radius:6px;border:1px solid var(--line);
+  background:repeating-linear-gradient(90deg,transparent 0 6px,var(--bg) 6px 8px),linear-gradient(90deg,var(--green) var(--v),var(--raise) var(--v))}
+.slider::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;margin-top:-7px;border-radius:50%;background:var(--fg);border:0;
+  box-shadow:0 0 0 4px var(--bg),0 0 0 5px var(--line)}
+.slider::-moz-range-thumb{width:24px;height:24px;border-radius:50%;background:var(--fg);border:0;box-shadow:0 0 0 4px var(--bg),0 0 0 5px var(--line)}
 .toggle{width:52px;height:30px;border-radius:15px;background:var(--raise);border:1px solid var(--line);position:relative;flex:none;transition:background .2s}
 .toggle::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:var(--muted);transition:transform .2s,background .2s}
 .toggle[aria-checked="true"]{background:var(--green);box-shadow:0 0 16px color-mix(in srgb,var(--green) 20%,transparent)}
@@ -253,7 +272,7 @@ header{display:flex;align-items:center;justify-content:space-between;min-height:
 </div>
 
 <script>
-const DEF={prep:5,work:7,rest:3,rounds:5,cycles:2,cycleRest:180,tick:true,beeps:true,voice:true};
+const DEF={prep:5,work:7,rest:3,rounds:5,cycles:2,cycleRest:180,tick:true,beeps:true,voice:true,sfx:true,vol:1};
 const META={
   prep:{name:"Prepare",c:"--yellow",say:"Get ready",code:"PH-00"},
   work:{name:"Work",c:"--red",say:"Work",code:"PH-01"},
@@ -306,6 +325,10 @@ function paintHome(){
 
 /* ---------- Analog-style synth SFX ---------- */
 const MASTER=.38;
+/* "Sound effects" switch + volume slider: every effect (timer cues AND interaction sounds) goes through the master bus */
+const masterLevel=()=>S.sfx?MASTER*S.vol:0;
+function setMaster(){if(master&&actx)master.gain.setTargetAtTime(masterLevel()*(ducked?.4:1),actx.currentTime,.02)}
+let ducked=false;
 let actx=null, master=null, tickAlt=false, voiceUnlocked=false;
 function ensureAudio(){
   try{if(navigator.audioSession&&navigator.audioSession.type!=="playback")navigator.audioSession.type="playback"}catch(e){}
@@ -318,7 +341,7 @@ function ensureAudio(){
       // master bus: saturation → compressor (evens out the levels) → master gain kept well under the voice
       shaper.curve=curve;const comp=actx.createDynamicsCompressor();
       comp.threshold.value=-24;comp.knee.value=12;comp.ratio.value=4;comp.attack.value=.003;comp.release.value=.15;
-      master=actx.createGain();master.gain.value=MASTER;shaper.connect(comp).connect(master).connect(actx.destination);master._in=shaper;
+      master=actx.createGain();master.gain.value=masterLevel();shaper.connect(comp).connect(master).connect(actx.destination);master._in=shaper;
     }
     if(actx.state!=="running")actx.resume().catch(()=>{});
     const b=actx.createBuffer(1,1,22050),s=actx.createBufferSource();s.buffer=b;s.connect(actx.destination);s.start(0);
@@ -332,7 +355,7 @@ document.addEventListener("visibilitychange",()=>{if(!document.hidden&&actx&&act
 let REC=null;   // when set, blip() draws into an offline context (pre-rendering) instead of playing live
 function blip({f=440,f2=null,type="square",dur=.12,vol=.2,cut=2400,cut2=null,q=6,detune=7,at=0,glide=null}){
   const ctx=REC?REC.ctx:actx, out=REC?REC.ctx.destination:master&&master._in;
-  if(!ctx||!out)return;if(!REC&&actx.state!=="running")actx.resume().catch(()=>{});
+  if(!ctx||!out||(!REC&&!S.sfx))return;if(!REC&&actx.state!=="running")actx.resume().catch(()=>{});
   const t=(REC?0:actx.currentTime)+at, g=ctx.createGain(), lp=ctx.createBiquadFilter();
   lp.type="lowpass";lp.Q.value=q;lp.frequency.setValueAtTime(cut,t);if(cut2)lp.frequency.exponentialRampToValueAtTime(cut2,t+dur);
   g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(vol,t+.006);g.gain.exponentialRampToValueAtTime(.0001,t+dur);
@@ -362,7 +385,7 @@ function prerender(){if(prerendered||!actx)return;prerendered=true;
     const done=b=>{if(b)BUF[k]=b};const pr=oc.startRendering();if(pr&&pr.then)pr.then(done).catch(()=>{});else oc.oncomplete=e=>done(e.renderedBuffer);
   }catch(e){REC=null}},30*i))}
 function play(k){
-  if(!actx||!master)return;if(actx.state!=="running")actx.resume().catch(()=>{});
+  if(!actx||!master||!S.sfx)return;if(actx.state!=="running")actx.resume().catch(()=>{});
   const b=BUF[k];if(!b){SYNTH[k][1]();return}   // not ready yet: synthesize live (same sound)
   const src=actx.createBufferSource();src.buffer=b;src.connect(master._in);src.start()}
 const SFX={
@@ -389,7 +412,7 @@ const TOGGLE_ON={f:720,sub:360,tail:760,hold:.012,rel:.014,cut:5200,bright:.18};
 const TOGGLE_OFF={f:560,sub:290,tail:500,hold:.012,rel:.018,cut:3600,bright:.08};
 const RESET_TONE={f:520,sub:280,tail:350,hold:.045,rel:.035,fall:.94};
 function tabTone(p,level=1){
-  if(!actx||!master)return;if(actx.state!=="running")actx.resume().catch(()=>{});
+  if(!actx||!master||!S.sfx)return;if(actx.state!=="running")actx.resume().catch(()=>{});
   const t=actx.currentTime, end=t+.004+p.hold+p.rel;
   const lp=actx.createBiquadFilter();lp.type="lowpass";lp.frequency.value=p.cut||2600;lp.Q.value=.7;
   const g=actx.createGain();g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.42*level,t+.004);
@@ -403,7 +426,7 @@ function tabTone(p,level=1){
 /* Tactile menu press: a muffled low "thock" (body) + a short band-passed noise click (contact) */
 let noiseBuf=null;
 function press(level=1){
-  if(!actx||!master)return;if(actx.state!=="running")actx.resume().catch(()=>{});
+  if(!actx||!master||!S.sfx)return;if(actx.state!=="running")actx.resume().catch(()=>{});
   const t=actx.currentTime;
   if(!noiseBuf){noiseBuf=actx.createBuffer(1,actx.sampleRate*.05,actx.sampleRate);const d=noiseBuf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,3)}
   const o=actx.createOscillator(),og=actx.createGain();o.type="sine";
@@ -426,7 +449,7 @@ function pickVoice(){try{
   enVoice=voiceList.find(v=>v.name===S.voiceName)||voiceList[0]||null}catch(e){}}
 try{pickVoice();speechSynthesis.onvoiceschanged=pickVoice}catch(e){}
 /* Ducking: while the voice speaks, the effects drop further so the words stay on top */
-function duck(on){if(master&&actx)master.gain.setTargetAtTime(on?MASTER*.4:MASTER,actx.currentTime,.06)}
+function duck(on){ducked=on;if(master&&actx)master.gain.setTargetAtTime(masterLevel()*(on?.4:1),actx.currentTime,.06)}
 function makeUtter(text){const u=new SpeechSynthesisUtterance(text);u.lang="en-US";if(enVoice)u.voice=enVoice;u.rate=1.1;u.volume=1;
   u.onstart=()=>duck(true);u.onend=u.onerror=()=>duck(false);return u}
 let readyUtter=null;   // the next line, built in advance so nothing is created at the moment it must be spoken
@@ -699,11 +722,32 @@ function openEditor(f){
 $("soundBtn").addEventListener("click",()=>{
   if(busy)return;SFX.ui();
   openOverlay("Sound",null,body=>{
-    for(const [k,t,d] of [["tick","Ticking","Twice per second"],["beeps","Countdown","Last 3 seconds"],["voice","Voice","Announces each phase"]]){
-      const r=document.createElement("div");r.className="trow";
+    const toggleRow=(k,t,d,after)=>{const r=document.createElement("div");r.className="trow";
       r.innerHTML='<span class="ttl">'+t+'<span class="mono">'+d+'</span></span><button class="toggle" role="switch" aria-label="'+t+'" aria-checked="'+S[k]+'"></button>';
-      const b=r.querySelector("button");b.addEventListener("click",()=>{S[k]=!S[k];b.setAttribute("aria-checked",S[k]);persist();SFX.toggle(S[k])});body.appendChild(r);
-    }
+      const b=r.querySelector("button");b.addEventListener("click",()=>{S[k]=!S[k];b.setAttribute("aria-checked",S[k]);persist();
+        if(k==="sfx"&&!S[k]){S.sfx=true;tabTone(TOGGLE_OFF,.7);S.sfx=false;setTimeout(setMaster,90)}   // play the "off" click, then mute
+        else{if(k==="sfx")setMaster();SFX.toggle(S[k])}
+        after&&after()});
+      body.appendChild(r);return r};
+    // 1. master switch
+    const fx=[];
+    toggleRow("sfx","Sound effects","All app sounds",()=>paintFx());
+    // 2. volume (only while effects are on)
+    const fold=document.createElement("div");fold.className="fold";
+    fold.innerHTML='<div><div class="vrow"><div class="vhead"><span class="ttl">Volume<span class="mono">Effects level</span></span><span class="vval" id="volVal"></span></div>'+
+      '<input class="slider" id="volSlider" type="range" min="0" max="100" step="1" aria-label="Volume"></div></div>';
+    body.appendChild(fold);
+    const sl=fold.querySelector("input"),vv=fold.querySelector("#volVal");let lastStep=-1;
+    const showVol=()=>{const v=Math.round(S.vol*100);sl.value=v;sl.style.setProperty("--v",v+"%");vv.textContent=String(v).padStart(3,"0")+"%"};
+    sl.addEventListener("input",()=>{S.vol=sl.value/100;showVol();setMaster();const st5=Math.round(sl.value/5);
+      if(st5!==lastStep){if(lastStep!==-1)SFX.ui();lastStep=st5}});   // a wheel tick every 5 %, at the new level
+    sl.addEventListener("change",()=>{persist();lastStep=-1});
+    showVol();
+    // 3. effect options (dimmed while effects are off) + voice (independent)
+    fx.push(toggleRow("tick","Ticking","Twice per second"),toggleRow("beeps","Countdown","Last 3 seconds"));
+    toggleRow("voice","Voice","Announces each phase");
+    function paintFx(){fold.classList.toggle("shut",!S.sfx);sl.disabled=!S.sfx;fx.forEach(r=>r.classList.toggle("off",!S.sfx))}
+    paintFx();
   },"Version 1.0 · Made by Profets",null);
 });
 
