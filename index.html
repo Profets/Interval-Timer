@@ -502,16 +502,22 @@ function sizeDial(){const r=dialCv.getBoundingClientRect(),dpr=Math.min(3,window
   for(let i=0;i<N;i++){const a0=i/N*2*Math.PI-Math.PI/2,a1=(i+1)/N*2*Math.PI-Math.PI/2,p=new Path2D();
     p.arc(cx,cy,r2,a0,a1);p.arc(cx,cy,r1,a1,a0,true);p.closePath();dialPaths.push(p)}}
 function mix(a,b,t){const h=x=>[1,3,5].map(i=>parseInt(x.slice(i,i+2),16));const A=h(a),B=h(b);return "rgb("+A.map((v,i)=>Math.round(v*t+B[i]*(1-t))).join(",")+")"}
+let dialSizeKey="",dialMore=false;
 function drawDial(){
   const [W,H]=dialSize;if(!W||!H||!dialPaths.length)return;
   const step=Math.round((dialEdge-Math.floor(dialEdge))*12),key=dialLit+"|"+step+"|"+dialCols.on+"|"+W;if(key===dialKey)return;dialKey=key;
   const s=Math.min(W,H)/300,edge=dialLit-1,frac=step/12,base=dialCols.on+"|"+dialCols.off+"|"+W;
   dctx.lineWidth=2.6*s;dctx.strokeStyle=dialCols.bg;dctx.lineJoin="miter";
-  const full=base!==dialBase;if(full){dialBase=base;dctx.clearRect(0,0,W,H);dialPainted=[]}
+  if(base!==dialBase){dialBase=base;dialPainted=[];if(W+"x"+H!==dialSizeKey){dialSizeKey=W+"x"+H;dctx.clearRect(0,0,W,H)}}
+  /* At most 40 bars per frame: a phase change (all 120 bars change colour) is spread over 3 frames
+     instead of one heavy frame right when the sounds play. */
+  let budget=40;
   for(let i=0;i<N;i++){
     const c=i<dialLit?(i===edge&&frac>0&&frac<1&&/^#/.test(dialCols.on)?mix(dialCols.on,dialCols.off,frac):dialCols.on):dialCols.off;
-    if(c===dialPainted[i])continue;dialPainted[i]=c;const p=dialPaths[i];
-    if(!full){dctx.fillStyle=dialCols.bg;dctx.fill(p)}   // wipe the old colour (incl. its soft edge) before repainting this bar
+    if(c===dialPainted[i])continue;
+    if(budget--<=0){dialKey="";if(!dialMore){dialMore=true;requestAnimationFrame(()=>{dialMore=false;drawDial()})}return}
+    dialPainted[i]=c;const p=dialPaths[i];
+    dctx.fillStyle=dialCols.bg;dctx.fill(p);   // wipe the old colour (incl. its soft edge) before repainting this bar
     dctx.fillStyle=c;dctx.fill(p);dctx.stroke(p)}
 }
 function drawGlow(){sizeDial();dialColors();drawDial()}   /* kept name: (re)measure + redraw */
