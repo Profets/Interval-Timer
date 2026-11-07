@@ -439,18 +439,26 @@ function voiceScore(v){const n=v.name;let s=0;
   if(/compact|eloquence|novelty|bad news|bells|boing|bubbles|cellos|whisper|zarvox|trinoids|albert|jester|organ|superstar|wobble|grandma|grandpa|rocko|shelley|flo|reed|sandy/i.test(n))s-=8;
   if(/en[-_](US|GB)/i.test(v.lang))s+=1;return s}
 function pickVoice(){try{
-  voiceList=speechSynthesis.getVoices().filter(v=>/^en(-|_)?/i.test(v.lang)).sort((a,b)=>voiceScore(b)-voiceScore(a));
+  voiceList=speechSynthesis.getVoices().filter(v=>/^en(-|_)?/i.test(v.lang)&&v.localService!==false).sort((a,b)=>voiceScore(b)-voiceScore(a));
   enVoice=voiceList.find(v=>v.name===S.voiceName)||voiceList[0]||null}catch(e){}}
 try{pickVoice();speechSynthesis.onvoiceschanged=pickVoice}catch(e){}
 /* Ducking: while the voice speaks, the effects drop further so the words stay on top */
 function duck(on){ducked=on;if(master&&actx)master.gain.setTargetAtTime(masterLevel()*(on?.4:1),actx.currentTime,.06)}
+/* Voice watchdog: if iOS never starts speaking (missing/broken voice, seen on iPad), each failed attempt can
+   freeze the app for a moment. 1st failure -> retry with the system default English voice;
+   2nd failure -> voice off for this session, so the timer stays smooth. */
+let vFails=0,voiceDead=false,vWatch=0;
+function voiceFailed(){clearTimeout(vWatch);vFails++;readyUtter=null;try{speechSynthesis.cancel()}catch(e){}
+  if(vFails===1&&enVoice)enVoice=null;else if(vFails>=2)voiceDead=true}
 function makeUtter(text){const u=new SpeechSynthesisUtterance(text);u.lang="en-US";if(enVoice)u.voice=enVoice;u.rate=1.1;u.volume=1;
-  u.onstart=()=>duck(true);u.onend=u.onerror=()=>duck(false);return u}
+  u.onstart=()=>{clearTimeout(vWatch);vFails=0;duck(true)};u.onend=()=>duck(false);
+  u.onerror=e=>{duck(false);if(!e||!/interrupted|canceled/.test(e.error||""))voiceFailed()};return u}
 let readyUtter=null;   // the next line, built in advance so nothing is created at the moment it must be spoken
-function prepareUtter(text){try{if(S.voice&&S.sfx&&(!readyUtter||readyUtter.text!==text))readyUtter=makeUtter(text)}catch(e){}}
-function say(text){if(!S.voice||!S.sfx)return;try{
+function prepareUtter(text){try{if(S.voice&&S.sfx&&!voiceDead&&(!readyUtter||readyUtter.text!==text))readyUtter=makeUtter(text)}catch(e){}}
+function say(text){if(!S.voice||!S.sfx||voiceDead)return;try{
   if(speechSynthesis.speaking||speechSynthesis.pending)speechSynthesis.cancel();   // cancel only when needed: it adds delay on iOS
-  const u=readyUtter&&readyUtter.text===text?readyUtter:makeUtter(text);readyUtter=null;speechSynthesis.speak(u)}catch(e){}}
+  const u=readyUtter&&readyUtter.text===text?readyUtter:makeUtter(text);readyUtter=null;speechSynthesis.speak(u);
+  clearTimeout(vWatch);vWatch=setTimeout(voiceFailed,2500)}catch(e){}}
 function speak(key,text){say(text)}
 const VOICE_LEAD=.32;   // seconds: iOS speech starts ~0.3 s after it is asked to
 function announce(type){SFX[phaseSfx[type]]();if(st.spoken!==st.idx){st.spoken=st.idx;speak(type,META[type].say)}}
