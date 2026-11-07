@@ -520,7 +520,7 @@ function fitScreen(){const d=$("device"),w=d.clientWidth,h=d.clientHeight;if(!w|
   const land=w>h*1.05&&w>=560;let k=land?Math.min(w/900,h/700):Math.min(w/390,h/844);
   k=land?Math.max(.6,Math.min(1.5,k)):Math.max(1,Math.min(1.6,k));
   document.documentElement.style.setProperty("--k",k.toFixed(3));d.classList.toggle("land",land);
-  d.style.setProperty("--maxw",Math.round((land?1000:460)*k)+"px");
+  d.style.setProperty("--maxw",land?Math.round(1000*k)+"px":"9999px");   // portrait: full width, only the normal side gutter
   sizeDial();dialKey="";drawDial();sizeCta()}
 addEventListener("resize",fitScreen);addEventListener("orientationchange",()=>setTimeout(fitScreen,250));
 function setLit(n){dialLit=n;dialEdge=n;drawDial()}
