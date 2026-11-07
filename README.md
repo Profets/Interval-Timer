@@ -38,4 +38,4 @@ fonts/                  Urbanist e JetBrains Mono (licenza libera OFL)
 - **Schermo sempre acceso:** mentre il timer gira l'app tiene acceso lo schermo da sola. Se dovesse spegnersi, imposta *Impostazioni → Schermo e luminosità → Blocco automatico → Mai* durante l'allenamento.
 - **A schermo bloccato** il timer resta preciso, ma suoni e voce si fermano finché non riapri l'app.
 - **Fluidità:** con la *Modalità risparmio energetico* attiva, iOS limita le animazioni a 30 fps.
-- **Voce:** usa la voce inglese del telefono. Per una voce più naturale scarica una voce "Avanzata/Premium" in *Impostazioni → Accessibilità → Contenuto letto ad alta voce → Voci → Inglese*.
+- **Voce:** è registrata dentro l'app (stessa voce su tutti i dispositivi, funziona anche offline), generata con il modello open source Kokoro TTS.
