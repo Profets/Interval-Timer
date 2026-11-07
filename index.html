@@ -458,15 +458,25 @@ function preSpeak(now){ // queue the next phase's word just before the change
   if(!S.voice||!S.sfx||st.spoken===st.idx+1)return;const left=Q[st.idx].dur-st.elapsed/1000;if(!now&&left>VOICE_LEAD)return;
   st.spoken=st.idx+1;if(st.idx+1<Q.length)speak(Q[st.idx+1].type,META[Q[st.idx+1].type].say);else speak("done","Workout complete")}
 let wake=null;
-/* Keep the screen on: Wake Lock API where it works, plus a tiny muted looping video (reliable on iOS home-screen apps) */
-let keepVid=null;
+/* Keep the screen on while the timer runs.
+   iOS 16 home-screen apps have no working Wake Lock API, so (like NoSleep.js) a tiny video WITH a silent audio
+   track plays, NOT muted, inside the page: iOS treats it as media playback and keeps the display awake.
+   It is started inside the Start/Resume tap, and restarted if iOS pauses it (app switch, call, etc.). */
+let keepVid=null,keepOn=false;
 function keepAwakeVideo(on){
+  keepOn=on;
   try{
-    if(!keepVid){keepVid=document.createElement("video");keepVid.src="keepawake.mp4";keepVid.muted=true;keepVid.loop=true;
-      keepVid.setAttribute("playsinline","");keepVid.setAttribute("muted","");keepVid.style.cssText="position:fixed;width:1px;height:1px;opacity:0;pointer-events:none";document.body.appendChild(keepVid)}
-    on?keepVid.play().catch(()=>{}):keepVid.pause();
+    if(!keepVid){keepVid=document.createElement("video");keepVid.setAttribute("title","Interval");keepVid.setAttribute("playsinline","");
+      keepVid.setAttribute("webkit-playsinline","");keepVid.preload="auto";keepVid.src="keepawake-a.mp4";
+      keepVid.style.cssText="position:absolute;left:-100%;top:-100%;width:16px;height:16px;pointer-events:none";
+      keepVid.addEventListener("timeupdate",()=>{if(keepVid.currentTime>3)keepVid.currentTime=Math.random()*.5});   // never reaches the end
+      keepVid.addEventListener("pause",()=>{if(keepOn)setTimeout(()=>{if(keepOn&&keepVid.paused)keepVid.play().catch(()=>{})},400)});
+      document.body.appendChild(keepVid)}
+    if(on){keepVid.muted=false;keepVid.volume=0;const pr=keepVid.play();if(pr&&pr.catch)pr.catch(()=>{keepVid.muted=true;keepVid.play().catch(()=>{})})}
+    else keepVid.pause();
   }catch(e){}
 }
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&keepOn){keepAwakeVideo(true);try{navigator.wakeLock&&navigator.wakeLock.request("screen").then(w=>wake=w).catch(()=>{})}catch(e){}}});
 async function holdWake(){keepAwakeVideo(true);try{wake=await navigator.wakeLock?.request("screen")}catch(e){wake=null}}
 function releaseWake(){keepAwakeVideo(false);try{wake&&wake.release()}catch(e){}wake=null}
 

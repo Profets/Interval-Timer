@@ -26,7 +26,7 @@ Sul telefono: chiudi Interval dal multitasking e riaprilo. L'app scarica sempre 
 index.html              l'app
 manifest.webmanifest    nome, icona e colori per la schermata Home
 sw.js                   funzionamento offline (aumenta la versione CACHE a ogni rilascio)
-keepawake.mp4           tiene lo schermo acceso mentre il timer gira
+keepawake-a.mp4         tiene lo schermo acceso mentre il timer gira (video muto con traccia audio silenziosa)
 apple-touch-icon.png    icona iPhone
 icon-192.png / icon-512.png
 fonts/                  Urbanist e JetBrains Mono (licenza libera OFL)
