@@ -593,7 +593,7 @@ function renderRun(){
   setHTML($("bigTime"),digits(fmt(rem)));$("bigTime").classList.toggle("warn",st.started&&rem<=3);
   const cr=cur.type==="cycleRest";
   setHTML($("cycleV"),digits(pad(S.cycles-cur.cycle+(cr?0:1))));
-  setHTML($("roundV"),digits(pad(cr?0:S.rounds-cur.round+1)));
+  setHTML($("roundV"),digits(pad(cr?0:S.rounds-cur.round+(cur.type==="rest"?0:1))));   // a round counts as done when its Work ends
   let left=remMs/1000;for(let i=st.idx+1;i<Q.length;i++)left+=Q[i].dur;
   setText($("remaining"),"Remaining "+fmt(Math.ceil(left)));
   setNextVis(true);
